@@ -7,6 +7,7 @@
  ****************************************************************************
  */
 #include <stdio.h>
+#include <vector>
 #include "McbService.hpp"
 #include "McbAccessControl2.hpp"
 #include "McbFormatError.hpp"
@@ -464,6 +465,28 @@ void McbAddPrvileges(HANDLE hToken)
     ::GetLastError())) 
 }
 
+LPTSTR ParamAsVector(LPCTSTR pszParam, std::vector<TCHAR> & vt)
+{
+    vt.clear();
+
+    if (pszParam == nullptr)
+        return nullptr;
+
+    size_t len = ::_tcslen(pszParam);
+
+    // Dont include quotes.
+    if (len > 0)
+    {
+        if (pszParam[0] == _T('"') && pszParam[len - 1] == _T('"'))
+            vt.assign(pszParam + 1, pszParam + len - 1);
+        else
+            vt.assign(pszParam, pszParam + len);
+    }
+
+    vt.push_back(_T('\0'));
+    return &vt[0];
+}
+
 /**
  ****************************************************************************
  * <P> Attempt to create process as a specified user.  </P>
@@ -793,9 +816,15 @@ void McbCreateProcessAsUser(const McbParams &params, McbResults &results,
         startInfo.lpTitle = (LPTSTR)params.m_strCmdLine.c_str();
                       
         PROCESS_INFORMATION procInfo;
+        std::vector<TCHAR> vtCmdLine;
+        LPTSTR pszMutableCmdLine = ParamAsVector(lpszCmdLine, vtCmdLine);
 
-        if (::CreateProcessAsUser(hToken, NULL, (LPTSTR)lpszCmdLine, 
-            NULL, NULL, FALSE, CREATE_NEW_CONSOLE | CREATE_BREAKAWAY_FROM_JOB, 
+        McbTRACE((McbTRACELOGON,
+            _T("CreateProcessAsUser commandLine: [%s]\n"),
+            pszMutableCmdLine))
+
+        if (::CreateProcessAsUser(hToken, NULL, pszMutableCmdLine,
+            NULL, NULL, FALSE, CREATE_NEW_CONSOLE | CREATE_BREAKAWAY_FROM_JOB,
             NULL, NULL, &startInfo, &procInfo))
         {
            /*
@@ -815,8 +844,9 @@ void McbCreateProcessAsUser(const McbParams &params, McbResults &results,
             McbERROR("CreateProcessAsUser", results)
 
             McbTRACE((McbTRACELOGON, 
-              _T("CreateProcessAsUser failed: %s, %d\n"),
-              results.m_strError.c_str(), results.m_dwError))
+              _T("CreateProcessAsUser failed: %s, %d\n")
+              _T("CommandLine: [%s]"),
+              results.m_strError.c_str(), results.m_dwError, pszMutableCmdLine))
         }
 
         ::CloseHandle(hToken);
