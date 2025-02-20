@@ -144,6 +144,27 @@ bool IsProtectedService(SC_HANDLE hService, ILogger& logger) {
     return protectionInfo->dwLaunchProtected != SERVICE_LAUNCH_PROTECTED_NONE;
 }
 
+void LogDependentServices(SC_HANDLE hService, ILogger& logger) {
+    DWORD bytesNeeded = 0;
+    DWORD serviceCount = 0;
+    if (!EnumDependentServices(hService, SERVICE_ACTIVE, NULL, 0, &bytesNeeded, &serviceCount) && GetLastError() != ERROR_MORE_DATA) {
+        logger.Log(L"EnumDependentServices failed: " + to_wstring(GetLastError()));
+        return;
+    }
+
+    std::vector<BYTE> buffer(bytesNeeded);
+    LPENUM_SERVICE_STATUS dependencies = reinterpret_cast<LPENUM_SERVICE_STATUS>(buffer.data());
+    if (!EnumDependentServices(hService, SERVICE_ACTIVE, dependencies, bytesNeeded, &bytesNeeded, &serviceCount)) {
+        logger.Log(L"EnumDependentServices failed: " + to_wstring(GetLastError()));
+        return;
+    }
+
+    logger.Log(L"Dependent services to stop:");
+    for (DWORD i = 0; i < serviceCount; ++i) {
+        logger.Log(L"  " + std::wstring(dependencies[i].lpServiceName));
+    }
+}
+
 void StopService(const std::wstring& serviceName, ILogger& logger) {
 
     //OutputDebugString(L"StopService110\n");
@@ -175,6 +196,8 @@ void StopService(const std::wstring& serviceName, ILogger& logger) {
     else {
         logger.Log(L"Service is not a protected service.");
     }
+
+    LogDependentServices(hService, logger);
 
     SERVICE_STATUS_PROCESS ssp;
     DWORD bytesNeeded;
