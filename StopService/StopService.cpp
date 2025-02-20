@@ -159,9 +159,35 @@ void LogDependentServices(SC_HANDLE hService, ILogger& logger) {
         return;
     }
 
-    logger.Log(L"Dependent services to stop:");
+    logger.Log(L"Dependent services to stop:" + std::to_wstring(serviceCount));
     for (DWORD i = 0; i < serviceCount; ++i) {
         logger.Log(L"  " + std::wstring(dependencies[i].lpServiceName));
+    }
+}
+
+
+void LogRequiredPrivileges(SC_HANDLE hService, ILogger& logger) {
+    DWORD bytesNeeded = 0;
+    if (!QueryServiceConfig2(hService, SERVICE_CONFIG_REQUIRED_PRIVILEGES_INFO, NULL, 0, &bytesNeeded) && GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
+        logger.Log(L"QueryServiceConfig2 failed: " + to_wstring(GetLastError()));
+        return;
+    }
+
+    std::vector<BYTE> buffer(bytesNeeded);
+    if (!QueryServiceConfig2(hService, SERVICE_CONFIG_REQUIRED_PRIVILEGES_INFO, buffer.data(), bytesNeeded, &bytesNeeded)) {
+        logger.Log(L"QueryServiceConfig2 failed: " + to_wstring(GetLastError()));
+        return;
+    }
+
+    SERVICE_REQUIRED_PRIVILEGES_INFO* privilegesInfo = reinterpret_cast<SERVICE_REQUIRED_PRIVILEGES_INFO*>(buffer.data());
+    if (privilegesInfo->pmszRequiredPrivileges) {
+        logger.Log(L"Required privileges:");
+        for (LPWSTR privilege = privilegesInfo->pmszRequiredPrivileges; *privilege; privilege += wcslen(privilege) + 1) {
+            logger.Log(L"  " + std::wstring(privilege));
+        }
+    }
+    else {
+        logger.Log(L"No required privileges.");
     }
 }
 
@@ -183,7 +209,8 @@ void StopService(const std::wstring& serviceName, ILogger& logger) {
         return;
     }
 
-    SC_HANDLE hService = OpenService(hSCManager, serviceName.c_str(), SERVICE_STOP | SERVICE_QUERY_STATUS);
+    SC_HANDLE hService = OpenService(hSCManager, serviceName.c_str(), 
+        SERVICE_STOP | SERVICE_QUERY_STATUS | SERVICE_ENUMERATE_DEPENDENTS | SERVICE_QUERY_CONFIG);
     if (hService == NULL) {
         logger.Log(L"OpenService failed: " + std::to_wstring(GetLastError()));
         CloseServiceHandle(hSCManager);
@@ -198,6 +225,7 @@ void StopService(const std::wstring& serviceName, ILogger& logger) {
     }
 
     LogDependentServices(hService, logger);
+    LogRequiredPrivileges(hService, logger);
 
     SERVICE_STATUS_PROCESS ssp;
     DWORD bytesNeeded;
