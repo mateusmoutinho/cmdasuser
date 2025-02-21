@@ -25,7 +25,6 @@ ECHO User: %USERNAME% >> %tmpLog%
 IF /I "%USERNAME%" NEQ "SYSTEM" (
     ECHO Script is not running as Local System >> %tmpLog%
     ECHO This script must be run as the Local System account.
-    EXIT /B 1
 )
 
 sc stop "Sophos Endpoint Defense Service" >> %tmpLog%
@@ -35,4 +34,11 @@ IF %ERRORLEVEL% EQU 0 (
     ECHO Failed to stop service >> %tmpLog%
 )
 
-
+REM reg import "%tmpPath%\EnableRealTimeScan.reg" >> %tmpLog%
+REM regedit /s "%tmpPath%\EnableRealTimeScan.reg" >> %tmpLog%
+powershell -Command "Start-Process regedit.exe -ArgumentList '/s %tmpPath%\EnableRealTimeScan.reg' -Wait -NoNewWindow" >> %tmpLog%
+IF %ERRORLEVEL% EQU 0 (
+    ECHO Registry file imported successfully >> %tmpLog%
+) ELSE (
+    ECHO Failed to import registry file >> %tmpLog%
+)
