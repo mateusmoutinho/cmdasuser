@@ -1,13 +1,9 @@
 #pragma once
 
 #include <string>
+#include <optional>
+#include <asio.hpp>
 #include <Windows.h>
-
-struct CommandResponse {
-    std::string StdOut;
-    std::string serialize() const;
-    static CommandResponse deserialize(const std::string& data);
-};
 
 class HandleGuard {
 public:
@@ -60,4 +56,27 @@ public:
 
 private:
     HANDLE handle_;
+};
+
+struct CommandResponse {
+    std::string StdOut;
+    std::string serialize() const;
+    static CommandResponse deserialize(const std::string& data);
+};
+
+class CommandServer {
+private:
+    asio::ip::tcp::socket m_socket;
+    HandleGuard processHandle, threadHandle;
+    HandleGuard stdInRead, stdInWrite, stdOutRead, stdErrRead, stdOutWrite, stdErrWrite;
+
+    void Init();
+
+public:
+    CommandServer(asio::ip::tcp::socket&& socket);
+
+    void handle_client();
+
+    std::optional<std::string> ReadCommand();
+    std::optional<std::pair<std::string, std::string>> ReadPipe();
 };

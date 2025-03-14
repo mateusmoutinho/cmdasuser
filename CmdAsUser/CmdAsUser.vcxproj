@@ -66,6 +66,7 @@
       <ObjectFileName>.\Debug\</ObjectFileName>
       <ProgramDataBaseFileName>.\Debug\</ProgramDataBaseFileName>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Midl>
       <TypeLibraryName>.\Debug\CmdAsUser.tlb</TypeLibraryName>
@@ -104,6 +105,7 @@
       </ObjectFileName>
       <ProgramDataBaseFileName>
       </ProgramDataBaseFileName>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Midl>
       <TypeLibraryName>.\Release\CmdAsUser.tlb</TypeLibraryName>
