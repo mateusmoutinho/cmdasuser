@@ -2,10 +2,11 @@
 #include <string>
 #include <thread>
 #include <vector>
-#include <asio.hpp>
 #include <array>
 #include <memory>
 #include <cstdio>
+#include <asio.hpp>
+#include <CommandLib.h>
 
 #ifdef _WIN32
 #define popen _popen
@@ -49,9 +50,12 @@ void handle_client(tcp::socket socket) {
             // Execute the command and capture the output
             std::string result = exec(command.c_str());
 
-            // Send the output back to the client
-            result += "\0";
-            asio::write(socket, asio::buffer(result), error);
+            // Create CommandResponse and serialize it
+            CommandResponse response{ result };
+            std::string serialized_response = response.serialize();
+
+            // Send the serialized response back to the client
+            asio::write(socket, asio::buffer(serialized_response), error);
         }
     }
     catch (std::exception& e) {

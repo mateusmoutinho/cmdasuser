@@ -11,6 +11,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CommandServer", "CommandSer
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CommandClient", "CommandClient\CommandClient.vcxproj", "{1C23605F-7738-45DC-8A28-4237AF215A13}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CommandLib", "CommandLib\CommandLib.vcxproj", "{A6DED602-69B5-4857-8075-726F8F9136E6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -33,6 +35,10 @@ Global
 		{1C23605F-7738-45DC-8A28-4237AF215A13}.Debug|Win32.Build.0 = Debug|Win32
 		{1C23605F-7738-45DC-8A28-4237AF215A13}.Release|Win32.ActiveCfg = Release|Win32
 		{1C23605F-7738-45DC-8A28-4237AF215A13}.Release|Win32.Build.0 = Release|Win32
+		{A6DED602-69B5-4857-8075-726F8F9136E6}.Debug|Win32.ActiveCfg = Debug|Win32
+		{A6DED602-69B5-4857-8075-726F8F9136E6}.Debug|Win32.Build.0 = Debug|Win32
+		{A6DED602-69B5-4857-8075-726F8F9136E6}.Release|Win32.ActiveCfg = Release|Win32
+		{A6DED602-69B5-4857-8075-726F8F9136E6}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

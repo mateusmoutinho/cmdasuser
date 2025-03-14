@@ -1,8 +1,9 @@
 #include <iostream>
 #include <string>
-#include <asio.hpp>
 #include <thread>
 #include <chrono>
+#include <asio.hpp>
+#include <CommandLib.h>
 
 // See <repo>/readme.md
 using asio::ip::tcp;
@@ -34,10 +35,13 @@ int main() {
             asio::streambuf response;
             asio::read_until(socket, response, "\0");
 
-            std::string reply;
             std::istream response_stream(&response);
-            std::getline(response_stream, reply, '\0');
-            std::cout << "Reply from server: " << reply << std::endl;
+            std::string serialized_response;
+            std::getline(response_stream, serialized_response, '\0');
+            
+            // Deserialize the response
+            CommandResponse command_response = CommandResponse::deserialize(serialized_response);
+            std::cout << "Reply from server: " << command_response.StdOut << std::endl;
         }
     }
     catch (std::exception& e) {
