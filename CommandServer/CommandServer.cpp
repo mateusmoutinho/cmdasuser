@@ -21,7 +21,7 @@ using asio::ip::tcp;
 void handle_client(tcp::socket socket) {
     try {
         HandleGuard processHandle, threadHandle;
-        HandleGuard stdInRead, stdInWrite, stdOutRead, stdOutWrite;
+        HandleGuard stdInRead, stdInWrite, stdOutRead, stdErrRead, stdOutWrite, stdErrWrite;
 
         // Create pipes for the child process's STDIN and STDOUT
         SECURITY_ATTRIBUTES saAttr = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
@@ -29,15 +29,17 @@ void handle_client(tcp::socket socket) {
         if (!CreatePipe(stdInRead.get_pointer(), stdInWrite.get_pointer(), &saAttr, 0) ||
             !SetHandleInformation(stdInWrite, HANDLE_FLAG_INHERIT, 0) ||
             !CreatePipe(stdOutRead.get_pointer(), stdOutWrite.get_pointer(), &saAttr, 0) ||
-            !SetHandleInformation(stdOutRead, HANDLE_FLAG_INHERIT, 0)) {
+            !SetHandleInformation(stdOutRead, HANDLE_FLAG_INHERIT, 0) || 
+            !CreatePipe(stdErrRead.get_pointer(), stdErrWrite.get_pointer(), &saAttr, 0) ||
+            !SetHandleInformation(stdErrRead, HANDLE_FLAG_INHERIT, 0)) {
             throw std::runtime_error("Failed to create pipes");
         }
 
         // Set up the start info struct
         STARTUPINFO siStartInfo = { sizeof(STARTUPINFO) };
-        siStartInfo.hStdError = stdOutWrite;
-        siStartInfo.hStdOutput = stdOutWrite;
         siStartInfo.hStdInput = stdInRead;
+        siStartInfo.hStdError = stdErrWrite;
+        siStartInfo.hStdOutput = stdOutWrite;
         siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
 
         // Create the child process
@@ -55,11 +57,11 @@ void handle_client(tcp::socket socket) {
         processHandle.reset(piProcInfo.hProcess);
         threadHandle.reset(piProcInfo.hThread);
 
-        std::vector<char> buffer(1024);
+        asio::streambuf buffer;
         asio::error_code error;
 
         while (true) {
-            size_t length = socket.read_some(asio::buffer(buffer), error);
+            asio::read_until(socket, buffer, '\0', error);
 
             if (error == asio::error::eof) {
                 std::cout << "Connection closed by client" << std::endl;
@@ -69,7 +71,9 @@ void handle_client(tcp::socket socket) {
                 throw asio::system_error(error);
             }
 
-            std::string command(buffer.data(), length);
+            std::string command;
+            std::istream is(&buffer);
+            std::getline(is, command, '\0');
             std::cout << "Received command: " << command << std::endl;
 
             // Write the command to the child process's STDIN
@@ -80,26 +84,47 @@ void handle_client(tcp::socket socket) {
 
             // Read the output from the child process's STDOUT
             DWORD read;
-            std::string result;
-            while (true) {
-                DWORD bytesAvailable = 0;
-                if (!PeekNamedPipe(stdOutRead, NULL, 0, NULL, &bytesAvailable, NULL)) {
-                    throw std::runtime_error("Failed to peek pipe");
+            std::string stdErrResponse;
+            std::string stdOutResponse;
+            std::vector<char> output_buffer(1024 * 10);
+
+            DWORD stdErrBytes = 1;
+            DWORD stdOutBytes = 1;
+            while (stdErrBytes != 0 || stdOutBytes != 0) {
+                if (!PeekNamedPipe(stdOutRead, NULL, 0, NULL, &stdOutBytes, NULL)) {
+                    throw std::runtime_error("Failed to peek stdout pipe");
                 }
 
-                if (bytesAvailable == 0) {
-                    break;
+                if (stdOutBytes != 0) {
+					if (!ReadFile(stdOutRead, output_buffer.data(), output_buffer.size(), &read, NULL))
+						stdOutBytes = 0;
+					else
+                    {
+                        if (read != 0)
+                            stdOutResponse.append(output_buffer.data(), read);
+                    }
                 }
 
-                if (!ReadFile(stdOutRead, buffer.data(), buffer.size(), &read, NULL) || read == 0) {
-                    break;
+                if (!PeekNamedPipe(stdErrRead, NULL, 0, NULL, &stdErrBytes, NULL)) {
+                    throw std::runtime_error("Failed to peek stderr pipe");
                 }
 
-                result.append(buffer.data(), read);
+                if (stdErrBytes != 0) {
+                    if (!ReadFile(stdErrRead, output_buffer.data(), output_buffer.size(), &read, NULL))
+                        stdErrBytes = 0;
+                    else
+                    {
+                        if (read != 0)
+                            stdErrResponse.append(output_buffer.data(), read);
+                    }
+                }
             }
 
+			std::cout << "StdOut: " << stdOutResponse << std::endl;
+			std::cout << "StdError: " << stdErrResponse << std::endl;
+
             // Create CommandResponse and serialize it
-            CommandResponse response{ result };
+            CommandResponse response{ stdOutResponse };
             std::string serialized_response = response.serialize();
 
             // Send the serialized response back to the client

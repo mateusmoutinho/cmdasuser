@@ -28,6 +28,7 @@ int main() {
                 break;
             }
 
+			command += '\0';
             asio::write(socket, asio::buffer(command));
             std::cout << "Command sent: " << command << std::endl;
 
