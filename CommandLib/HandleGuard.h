@@ -2,26 +2,27 @@
 
 #include <Windows.h>
 
-class HandleGuard {
+template <typename HandleType>
+class HandleGuardImpl {
 public:
-    explicit HandleGuard(HANDLE handle = nullptr) : handle_(handle) {}
+    explicit HandleGuardImpl(HandleType handle = nullptr) : handle_(handle) {}
 
-    ~HandleGuard() {
+    ~HandleGuardImpl() {
         if (handle_ != nullptr && handle_ != INVALID_HANDLE_VALUE) {
             CloseHandle(handle_);
         }
     }
 
     // Disable copy semantics
-    HandleGuard(const HandleGuard&) = delete;
-    HandleGuard& operator=(const HandleGuard&) = delete;
+    HandleGuardImpl(const HandleGuardImpl&) = delete;
+    HandleGuardImpl& operator=(const HandleGuardImpl&) = delete;
 
     // Enable move semantics
-    HandleGuard(HandleGuard&& other) noexcept : handle_(other.handle_) {
+    HandleGuardImpl(HandleGuardImpl&& other) noexcept : handle_(other.handle_) {
         other.handle_ = nullptr;
     }
 
-    HandleGuard& operator=(HandleGuard&& other) noexcept {
+    HandleGuardImpl& operator=(HandleGuardImpl&& other) noexcept {
         if (this != &other) {
             if (handle_ != nullptr && handle_ != INVALID_HANDLE_VALUE) {
                 CloseHandle(handle_);
@@ -32,25 +33,28 @@ public:
         return *this;
     }
 
-    HANDLE get() const {
+    HandleType get() const {
         return handle_;
     }
 
-    HANDLE* get_pointer() {
+    HandleType* get_pointer() {
         return &handle_;
     }
 
-    void reset(HANDLE handle = nullptr) {
+    void reset(HandleType handle = nullptr) {
         if (handle_ != nullptr && handle_ != INVALID_HANDLE_VALUE) {
             CloseHandle(handle_);
         }
         handle_ = handle;
     }
 
-    operator HANDLE() const {
+    operator HandleType() const {
         return handle_;
     }
 
 private:
-    HANDLE handle_;
+    HandleType handle_;
 };
+
+using HandleGuard = HandleGuardImpl<HANDLE>;
+
