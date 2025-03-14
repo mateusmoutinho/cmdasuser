@@ -24,8 +24,8 @@ CommandServer::CommandServer(tcp::socket&& socket) : socket_(std::move(socket))
 
 void CommandServer::init() {
 
-    //init_pipes();
-    init_overlapped_pipes();
+    init_pipes();
+    //init_overlapped_pipes();
 
     STARTUPINFO startupInfo = { sizeof(STARTUPINFO) };
     startupInfo.hStdInput = stdInRead_;
@@ -90,6 +90,14 @@ void CommandServer::init_overlapped_pipes()
         !DuplicateHandleForOverlappedIO(tempStdErrWrite, stdErrWrite_)) {
         throw std::runtime_error("Failed to duplicate handles for overlapped I/O");
     }
+
+    // Set the duplicated handles to be inheritable
+    if (!SetHandleInformation(stdOutRead_.get(), HANDLE_FLAG_INHERIT, 0) ||
+        !SetHandleInformation(stdOutWrite_.get(), HANDLE_FLAG_INHERIT, 0) ||
+        !SetHandleInformation(stdErrRead_.get(), HANDLE_FLAG_INHERIT, 0) ||
+        !SetHandleInformation(stdErrWrite_.get(), HANDLE_FLAG_INHERIT, 0)) {
+        throw std::runtime_error("Failed to set handle information for overlapped I/O");
+    }
 }
 
 std::optional<std::string> CommandServer::read_request() {
@@ -112,8 +120,13 @@ std::optional<std::string> CommandServer::read_request() {
 }
 
 void CommandServer::handle_client() {
+
+    const int max_retries = 10000; // TODO:
+    const DWORD sleep_interval_ms = 200;
+
     while (true) {
-        auto response = read_response2(10000);
+        //auto response = read_response2(10000);
+        auto response = read_response(max_retries, sleep_interval_ms);
         if (!response) {
             throw std::runtime_error("Failed to read response");
         }
@@ -123,7 +136,7 @@ void CommandServer::handle_client() {
         if (!request) {
             break;
         }
-		process_request(*request);
+		process_request(std::move(*request));
     }
 }
 
@@ -140,9 +153,12 @@ void CommandServer::send_response(std::pair<std::string, std::string> response)
     asio::write(socket_, asio::buffer(serialized_response), error);
 }
 
-void CommandServer::process_request(const std::string& command)
+void CommandServer::process_request(std::string && command)
 {
     std::cout << "Received command: " << command << std::endl;
+
+    // Append a newline character to the command to signal cmd.exe to process it
+    command += "\n";
 
     // Write the command to the child process's STDIN
     DWORD written;
@@ -376,4 +392,15 @@ std::optional<std::pair<std::string, std::string>> CommandServer::read_response(
     }
 
     return std::make_pair(std::move(stdOutResponse), std::move(stdErrResponse));
+}
+
+std::optional<std::pair<std::string, std::string>> CommandServer::read_response(int max_retries, DWORD sleep_interval_ms) {
+	for (int i = 0; i < max_retries; i++) {
+		auto response = read_response();
+		if (response) {
+			return response;
+		}
+		std::this_thread::sleep_for(std::chrono::milliseconds(sleep_interval_ms));
+	}
+	return std::nullopt;
 }
