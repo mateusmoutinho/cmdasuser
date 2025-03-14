@@ -5,7 +5,5 @@ std::string CommandResponse::serialize() const {
 }
 
 CommandResponse CommandResponse::deserialize(const std::string& data) {
-    CommandResponse response;
-    response.StdOut = data;
-    return response;
+    return CommandResponse(data);
 }

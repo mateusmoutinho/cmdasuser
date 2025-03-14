@@ -7,10 +7,10 @@ using asio::ip::tcp;
 
 CommandServer::CommandServer(tcp::socket&& socket) : socket_(std::move(socket))
 {
-    Init();
+    init();
 }
 
-void CommandServer::Init() {
+void CommandServer::init() {
     // Create pipes for the child process's STDIN and STDOUT
     SECURITY_ATTRIBUTES saAttr = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
 
@@ -23,21 +23,18 @@ void CommandServer::Init() {
         throw std::runtime_error("Failed to create pipes");
     }
 
-    // Set up the start info struct
     STARTUPINFO siStartInfo = { sizeof(STARTUPINFO) };
     siStartInfo.hStdInput = stdInRead_;
     siStartInfo.hStdError = stdErrWrite_;
     siStartInfo.hStdOutput = stdOutWrite_;
     siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
 
-    // Create the child process
-    PROCESS_INFORMATION piProcInfo;
-
     std::string cmd = "cmd.exe";
     std::vector<TCHAR> command_line;
     command_line.assign(cmd.begin(), cmd.end());
     command_line.push_back('\0'); // Add null terminator
 
+    PROCESS_INFORMATION piProcInfo;
     if (!CreateProcess(NULL, &command_line[0], NULL, NULL, TRUE, 0, NULL, NULL, &siStartInfo, &piProcInfo)) {
         throw std::runtime_error("Failed to create process");
     }
@@ -46,7 +43,7 @@ void CommandServer::Init() {
     threadHandle_.reset(piProcInfo.hThread);
 }
 
-std::optional<std::string> CommandServer::ReadCommand() {
+std::optional<std::string> CommandServer::read_request() {
     asio::streambuf buffer;
     asio::error_code error;
     asio::read_until(socket_, buffer, '\0', error);
@@ -65,42 +62,20 @@ std::optional<std::string> CommandServer::ReadCommand() {
     return command;
 }
 
-void CommandServer::handle_client()
-{
+void CommandServer::handle_client() {
     try {
         while (true) {
-            auto commandOpt = ReadCommand();
-            if (!commandOpt) {
+            auto request = read_request();
+            if (!request) {
                 break;
             }
+			send_request(*request);
 
-            std::string command = *commandOpt;
-            std::cout << "Received command: " << command << std::endl;
-
-            // Write the command to the child process's STDIN
-            DWORD written;
-            if (!WriteFile(stdInWrite_, command.c_str(), command.size(), &written, NULL)) {
-                throw std::runtime_error("Failed to write to child process");
+            auto response = read_response();
+            if (!response) {
+                throw std::runtime_error("Failed to read response");
             }
-
-            // Read the output from the child process's STDOUT and STDERR
-            auto pipeOutputOpt = ReadPipe();
-            if (!pipeOutputOpt) {
-                throw std::runtime_error("Failed to read from pipes");
-            }
-
-            auto& [stdOutResponse, stdErrResponse] = *pipeOutputOpt;
-
-            std::cout << "StdOut: " << stdOutResponse << std::endl;
-            std::cout << "StdError: " << stdErrResponse << std::endl;
-
-            // Create CommandResponse and serialize it
-            CommandResponse response{ stdOutResponse };
-            std::string serialized_response = response.serialize();
-
-            // Send the serialized response back to the client
-            asio::error_code error;
-            asio::write(socket_, asio::buffer(serialized_response), error);
+			send_response(*response);
         }
     }
     catch (std::exception& e) {
@@ -108,7 +83,31 @@ void CommandServer::handle_client()
     }
 }
 
-std::optional<std::pair<std::string, std::string>> CommandServer::ReadPipe() {
+void CommandServer::send_response(std::pair<std::string, std::string> response)
+{
+    auto& [stdOutResponse, stdErrResponse] = response;
+    std::cout << "StdOut: " << stdOutResponse << std::endl;
+    std::cout << "StdError: " << stdErrResponse << std::endl;
+
+    CommandResponse commandResponse{ stdOutResponse };
+    std::string serialized_response = commandResponse.serialize();
+
+    asio::error_code error;
+    asio::write(socket_, asio::buffer(serialized_response), error);
+}
+
+void CommandServer::send_request(const std::string& command)
+{
+    std::cout << "Received command: " << command << std::endl;
+
+    // Write the command to the child process's STDIN
+    DWORD written;
+    if (!WriteFile(stdInWrite_, command.c_str(), command.size(), &written, NULL)) {
+        throw std::runtime_error("Failed to write to child process");
+    }
+}
+
+std::optional<std::pair<std::string, std::string>> CommandServer::read_response() {
     DWORD read;
     std::string stdErrResponse;
     std::string stdOutResponse;
