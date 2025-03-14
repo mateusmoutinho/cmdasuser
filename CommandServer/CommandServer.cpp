@@ -1,20 +1,65 @@
-// CommandServer.cpp : This file contains the 'main' function. Program execution begins and ends there.
-//
-
 #include <iostream>
+#include <string>
+#include <thread>
+#include <vector>
+#include <asio.hpp>
 
-int main()
-{
-    std::cout << "Hello World!\n";
+// BUILD INSTRUCTIONS:
+// For boost.asio, you need to install the Boost library.
+//   Install vcpkg:
+//     git clone https://github.com/microsoft/vcpkg.git C:\vcpkg
+//     cd C:\vcpkg
+//     bootstrap-vcpkg.bat
+//     vcpkg integrate install
+//   Install Boost.Asio:
+//     vcpkg install asio
+// In Windows settings add the following environment variable:
+//   MY_VCPKG_ROOT=C:\vcpkg
+// 
+//  $(MY_VCPKG_ROOT)\installed\x64-windows\include
+
+using asio::ip::tcp;
+
+void handle_client(tcp::socket socket) {
+    try {
+        std::vector<char> buffer(1024);
+        asio::error_code error;
+        size_t length = socket.read_some(asio::buffer(buffer), error);
+
+        if (error == asio::error::eof) {
+            std::cout << "Connection closed by client" << std::endl;
+        }
+        else if (error) {
+            throw asio::system_error(error);
+        }
+
+        std::string command(buffer.data(), length);
+        std::cout << "Received command: " << command << std::endl;
+
+        // Execute the command
+        system(command.c_str());
+    }
+    catch (std::exception& e) {
+        std::cerr << "Exception in thread: " << e.what() << std::endl;
+    }
 }
 
-// Run program: Ctrl + F5 or Debug > Start Without Debugging menu
-// Debug program: F5 or Debug > Start Debugging menu
+int main() {
+    try {
+        asio::io_context io_context;
+        tcp::acceptor acceptor(io_context, tcp::endpoint(tcp::v4(), 54000));
 
-// Tips for Getting Started: 
-//   1. Use the Solution Explorer window to add/manage files
-//   2. Use the Team Explorer window to connect to source control
-//   3. Use the Output window to see build output and other messages
-//   4. Use the Error List window to view errors
-//   5. Go to Project > Add New Item to create new code files, or Project > Add Existing Item to add existing code files to the project
-//   6. In the future, to open this project again, go to File > Open > Project and select the .sln file
+        std::cout << "Server is listening on port 54000..." << std::endl;
+
+        while (true) {
+            tcp::socket socket(io_context);
+            acceptor.accept(socket);
+            std::thread(handle_client, std::move(socket)).detach();
+        }
+    }
+    catch (std::exception& e) {
+        std::cerr << "Exception: " << e.what() << std::endl;
+    }
+
+    return 0;
+}
