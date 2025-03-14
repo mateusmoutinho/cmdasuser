@@ -5,7 +5,7 @@
 
 using asio::ip::tcp;
 
-CommandServer::CommandServer(tcp::socket&& socket) : m_socket(std::move(socket))
+CommandServer::CommandServer(tcp::socket&& socket) : socket_(std::move(socket))
 {
     Init();
 }
@@ -14,20 +14,20 @@ void CommandServer::Init() {
     // Create pipes for the child process's STDIN and STDOUT
     SECURITY_ATTRIBUTES saAttr = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
 
-    if (!CreatePipe(stdInRead.get_pointer(), stdInWrite.get_pointer(), &saAttr, 0) ||
-        !SetHandleInformation(stdInWrite, HANDLE_FLAG_INHERIT, 0) ||
-        !CreatePipe(stdOutRead.get_pointer(), stdOutWrite.get_pointer(), &saAttr, 0) ||
-        !SetHandleInformation(stdOutRead, HANDLE_FLAG_INHERIT, 0) ||
-        !CreatePipe(stdErrRead.get_pointer(), stdErrWrite.get_pointer(), &saAttr, 0) ||
-        !SetHandleInformation(stdErrRead, HANDLE_FLAG_INHERIT, 0)) {
+    if (!CreatePipe(stdInRead_.get_pointer(), stdInWrite_.get_pointer(), &saAttr, 0) ||
+        !SetHandleInformation(stdInWrite_, HANDLE_FLAG_INHERIT, 0) ||
+        !CreatePipe(stdOutRead_.get_pointer(), stdOutWrite_.get_pointer(), &saAttr, 0) ||
+        !SetHandleInformation(stdOutRead_, HANDLE_FLAG_INHERIT, 0) ||
+        !CreatePipe(stdErrRead_.get_pointer(), stdErrWrite_.get_pointer(), &saAttr, 0) ||
+        !SetHandleInformation(stdErrRead_, HANDLE_FLAG_INHERIT, 0)) {
         throw std::runtime_error("Failed to create pipes");
     }
 
     // Set up the start info struct
     STARTUPINFO siStartInfo = { sizeof(STARTUPINFO) };
-    siStartInfo.hStdInput = stdInRead;
-    siStartInfo.hStdError = stdErrWrite;
-    siStartInfo.hStdOutput = stdOutWrite;
+    siStartInfo.hStdInput = stdInRead_;
+    siStartInfo.hStdError = stdErrWrite_;
+    siStartInfo.hStdOutput = stdOutWrite_;
     siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
 
     // Create the child process
@@ -42,14 +42,14 @@ void CommandServer::Init() {
         throw std::runtime_error("Failed to create process");
     }
 
-    processHandle.reset(piProcInfo.hProcess);
-    threadHandle.reset(piProcInfo.hThread);
+    processHandle_.reset(piProcInfo.hProcess);
+    threadHandle_.reset(piProcInfo.hThread);
 }
 
 std::optional<std::string> CommandServer::ReadCommand() {
     asio::streambuf buffer;
     asio::error_code error;
-    asio::read_until(m_socket, buffer, '\0', error);
+    asio::read_until(socket_, buffer, '\0', error);
 
     if (error == asio::error::eof) {
         std::cout << "Connection closed by client" << std::endl;
@@ -79,7 +79,7 @@ void CommandServer::handle_client()
 
             // Write the command to the child process's STDIN
             DWORD written;
-            if (!WriteFile(stdInWrite, command.c_str(), command.size(), &written, NULL)) {
+            if (!WriteFile(stdInWrite_, command.c_str(), command.size(), &written, NULL)) {
                 throw std::runtime_error("Failed to write to child process");
             }
 
@@ -100,7 +100,7 @@ void CommandServer::handle_client()
 
             // Send the serialized response back to the client
             asio::error_code error;
-            asio::write(m_socket, asio::buffer(serialized_response), error);
+            asio::write(socket_, asio::buffer(serialized_response), error);
         }
     }
     catch (std::exception& e) {
@@ -117,12 +117,12 @@ std::optional<std::pair<std::string, std::string>> CommandServer::ReadPipe() {
     DWORD stdErrBytes = 1;
     DWORD stdOutBytes = 1;
     while (stdErrBytes != 0 || stdOutBytes != 0) {
-        if (!PeekNamedPipe(stdOutRead, NULL, 0, NULL, &stdOutBytes, NULL)) {
+        if (!PeekNamedPipe(stdOutRead_, NULL, 0, NULL, &stdOutBytes, NULL)) {
             throw std::runtime_error("Failed to peek stdout pipe");
         }
 
         if (stdOutBytes != 0) {
-            if (!ReadFile(stdOutRead, output_buffer.data(), output_buffer.size(), &read, NULL))
+            if (!ReadFile(stdOutRead_, output_buffer.data(), output_buffer.size(), &read, NULL))
                 stdOutBytes = 0;
             else
             {
@@ -131,12 +131,12 @@ std::optional<std::pair<std::string, std::string>> CommandServer::ReadPipe() {
             }
         }
 
-        if (!PeekNamedPipe(stdErrRead, NULL, 0, NULL, &stdErrBytes, NULL)) {
+        if (!PeekNamedPipe(stdErrRead_, NULL, 0, NULL, &stdErrBytes, NULL)) {
             throw std::runtime_error("Failed to peek stderr pipe");
         }
 
         if (stdErrBytes != 0) {
-            if (!ReadFile(stdErrRead, output_buffer.data(), output_buffer.size(), &read, NULL))
+            if (!ReadFile(stdErrRead_, output_buffer.data(), output_buffer.size(), &read, NULL))
                 stdErrBytes = 0;
             else
             {

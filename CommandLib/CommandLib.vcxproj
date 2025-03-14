@@ -139,6 +139,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="CommandLib.h" />
+    <ClInclude Include="HandleGuard.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CommandLib.cpp" />
