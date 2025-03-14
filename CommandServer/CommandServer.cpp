@@ -4,20 +4,7 @@
 #include <vector>
 #include <asio.hpp>
 
-// BUILD INSTRUCTIONS:
-// For boost.asio, you need to install the Boost library.
-//   Install vcpkg:
-//     git clone https://github.com/microsoft/vcpkg.git C:\vcpkg
-//     cd C:\vcpkg
-//     bootstrap-vcpkg.bat
-//     vcpkg integrate install
-//   Install Boost.Asio:
-//     vcpkg install asio
-// In Windows settings add the following environment variable:
-//   MY_VCPKG_ROOT=C:\vcpkg
-// 
-//  $(MY_VCPKG_ROOT)\installed\x64-windows\include
-
+// See <repo>/readme.md
 using asio::ip::tcp;
 
 void handle_client(tcp::socket socket) {
