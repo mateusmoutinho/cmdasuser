@@ -9,7 +9,7 @@ using asio::ip::tcp;
 
 int main() {
     try {
-        std::this_thread::sleep_for(std::chrono::seconds(10));
+        // std::this_thread::sleep_for(std::chrono::seconds(10));
 
         asio::io_context io_context;
         tcp::resolver resolver(io_context);
@@ -18,10 +18,18 @@ int main() {
         tcp::socket socket(io_context);
         asio::connect(socket, endpoints);
 
-        std::string command = "echo Hello, Server!";
-        asio::write(socket, asio::buffer(command));
+        std::string command;
+        while (true) {
+            std::cout << "Enter command: ";
+            std::getline(std::cin, command);
 
-        std::cout << "Command sent: " << command << std::endl;
+            if (command == "exit") {
+                break;
+            }
+
+            asio::write(socket, asio::buffer(command));
+            std::cout << "Command sent: " << command << std::endl;
+        }
     }
     catch (std::exception& e) {
         std::cerr << "Exception: " << e.what() << std::endl;
