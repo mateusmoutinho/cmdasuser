@@ -142,6 +142,7 @@
     <ClInclude Include="HandleGuard.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="CommandClient.cpp" />
     <ClCompile Include="CommandLib.cpp" />
     <ClCompile Include="CommandServer.cpp" />
   </ItemGroup>

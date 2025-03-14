@@ -20,29 +20,19 @@ int main() {
         asio::connect(socket, endpoints);
 
         std::string command;
+		CommandClient client(std::move(socket));
+
         while (true) {
+            CommandResponse command_response = client.read_response();
+            std::cout << "Server says: " << command_response.StdOut << std::endl;
+
             std::cout << "Enter command: ";
             std::getline(std::cin, command);
 
             if (command == "exit") {
                 break;
             }
-
-			command += '\0';
-            asio::write(socket, asio::buffer(command));
-            std::cout << "Command sent: " << command << std::endl;
-
-            // Read response from server
-            asio::streambuf response;
-            asio::read_until(socket, response, "\0");
-
-            std::istream response_stream(&response);
-            std::string serialized_response;
-            std::getline(response_stream, serialized_response, '\0');
-            
-            // Deserialize the response
-            CommandResponse command_response = CommandResponse::deserialize(serialized_response);
-            std::cout << "Reply from server: " << command_response.StdOut << std::endl;
+			client.send_request(std::move(command));
         }
     }
     catch (std::exception& e) {

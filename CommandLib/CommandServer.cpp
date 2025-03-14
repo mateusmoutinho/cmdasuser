@@ -11,9 +11,9 @@ CommandServer::CommandServer(tcp::socket&& socket) : socket_(std::move(socket))
 }
 
 void CommandServer::init() {
-    // Create pipes for the child process's STDIN and STDOUT
     SECURITY_ATTRIBUTES saAttr = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
 
+    // Create pipes for the child process's STDIN and STDOUT
     if (!CreatePipe(stdInRead_.get_pointer(), stdInWrite_.get_pointer(), &saAttr, 0) ||
         !SetHandleInformation(stdInWrite_, HANDLE_FLAG_INHERIT, 0) ||
         !CreatePipe(stdOutRead_.get_pointer(), stdOutWrite_.get_pointer(), &saAttr, 0) ||
@@ -23,24 +23,24 @@ void CommandServer::init() {
         throw std::runtime_error("Failed to create pipes");
     }
 
-    STARTUPINFO siStartInfo = { sizeof(STARTUPINFO) };
-    siStartInfo.hStdInput = stdInRead_;
-    siStartInfo.hStdError = stdErrWrite_;
-    siStartInfo.hStdOutput = stdOutWrite_;
-    siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
+    STARTUPINFO startupInfo = { sizeof(STARTUPINFO) };
+    startupInfo.hStdInput = stdInRead_;
+    startupInfo.hStdError = stdErrWrite_;
+    startupInfo.hStdOutput = stdOutWrite_;
+    startupInfo.dwFlags |= STARTF_USESTDHANDLES;
 
     std::string cmd = "cmd.exe";
     std::vector<TCHAR> command_line;
     command_line.assign(cmd.begin(), cmd.end());
     command_line.push_back('\0'); // Add null terminator
 
-    PROCESS_INFORMATION piProcInfo;
-    if (!CreateProcess(NULL, &command_line[0], NULL, NULL, TRUE, 0, NULL, NULL, &siStartInfo, &piProcInfo)) {
+    PROCESS_INFORMATION procInfo;
+    if (!CreateProcess(NULL, &command_line[0], NULL, NULL, TRUE, 0, NULL, NULL, &startupInfo, &procInfo)) {
         throw std::runtime_error("Failed to create process");
     }
 
-    processHandle_.reset(piProcInfo.hProcess);
-    threadHandle_.reset(piProcInfo.hThread);
+    threadHandle_.reset(procInfo.hThread);
+    processHandle_.reset(procInfo.hProcess);
 }
 
 std::optional<std::string> CommandServer::read_request() {
@@ -63,23 +63,18 @@ std::optional<std::string> CommandServer::read_request() {
 }
 
 void CommandServer::handle_client() {
-    try {
-        while (true) {
-            auto request = read_request();
-            if (!request) {
-                break;
-            }
-			send_request(*request);
-
-            auto response = read_response();
-            if (!response) {
-                throw std::runtime_error("Failed to read response");
-            }
-			send_response(*response);
+    while (true) {
+        auto response = read_response();
+        if (!response) {
+            throw std::runtime_error("Failed to read response");
         }
-    }
-    catch (std::exception& e) {
-        std::cerr << "Exception in thread: " << e.what() << std::endl;
+        send_response(*response);
+
+        auto request = read_request();
+        if (!request) {
+            break;
+        }
+		process_request(*request);
     }
 }
 
@@ -96,7 +91,7 @@ void CommandServer::send_response(std::pair<std::string, std::string> response)
     asio::write(socket_, asio::buffer(serialized_response), error);
 }
 
-void CommandServer::send_request(const std::string& command)
+void CommandServer::process_request(const std::string& command)
 {
     std::cout << "Received command: " << command << std::endl;
 
