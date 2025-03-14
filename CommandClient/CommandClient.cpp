@@ -29,6 +29,15 @@ int main() {
 
             asio::write(socket, asio::buffer(command));
             std::cout << "Command sent: " << command << std::endl;
+
+            // Read response from server
+            asio::streambuf response;
+            asio::read_until(socket, response, "\0");
+
+            std::string reply;
+            std::istream response_stream(&response);
+            std::getline(response_stream, reply, '\0');
+            std::cout << "Reply from server: " << reply << std::endl;
         }
     }
     catch (std::exception& e) {
