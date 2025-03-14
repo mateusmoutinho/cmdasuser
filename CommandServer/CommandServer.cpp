@@ -18,36 +18,26 @@
 // See <repo>/readme.md
 using asio::ip::tcp;
 
-//std::string exec(const char* cmd) {
-//    std::array<char, 128> buffer;
-//    std::string result;
-//    std::shared_ptr<FILE> pipe(popen(cmd, "r"), pclose);
-//    if (!pipe) throw std::runtime_error("popen() failed!");
-//    while (!feof(pipe.get())) {
-//        if (fgets(buffer.data(), 128, pipe.get()) != nullptr)
-//            result += buffer.data();
-//    }
-//    return result;
-//}
-
 void handle_client(tcp::socket socket) {
     try {
+        HandleGuard processHandle, threadHandle;
+        HandleGuard stdInRead, stdInWrite, stdOutRead, stdOutWrite;
+
         // Create pipes for the child process's STDIN and STDOUT
-        HANDLE hStdInRead, hStdInWrite, hStdOutRead, hStdOutWrite;
         SECURITY_ATTRIBUTES saAttr = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
 
-        if (!CreatePipe(&hStdInRead, &hStdInWrite, &saAttr, 0) ||
-            !SetHandleInformation(hStdInWrite, HANDLE_FLAG_INHERIT, 0) ||
-            !CreatePipe(&hStdOutRead, &hStdOutWrite, &saAttr, 0) ||
-            !SetHandleInformation(hStdOutRead, HANDLE_FLAG_INHERIT, 0)) {
+        if (!CreatePipe(stdInRead.get_pointer(), stdInWrite.get_pointer(), &saAttr, 0) ||
+            !SetHandleInformation(stdInWrite, HANDLE_FLAG_INHERIT, 0) ||
+            !CreatePipe(stdOutRead.get_pointer(), stdOutWrite.get_pointer(), &saAttr, 0) ||
+            !SetHandleInformation(stdOutRead, HANDLE_FLAG_INHERIT, 0)) {
             throw std::runtime_error("Failed to create pipes");
         }
 
         // Set up the start info struct
         STARTUPINFO siStartInfo = { sizeof(STARTUPINFO) };
-        siStartInfo.hStdError = hStdOutWrite;
-        siStartInfo.hStdOutput = hStdOutWrite;
-        siStartInfo.hStdInput = hStdInRead;
+        siStartInfo.hStdError = stdOutWrite;
+        siStartInfo.hStdOutput = stdOutWrite;
+        siStartInfo.hStdInput = stdInRead;
         siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
 
         // Create the child process
@@ -62,9 +52,8 @@ void handle_client(tcp::socket socket) {
             throw std::runtime_error("Failed to create process");
         }
 
-        // Close handles to the child process and its primary thread
-        CloseHandle(piProcInfo.hProcess);
-        CloseHandle(piProcInfo.hThread);
+        processHandle.reset(piProcInfo.hProcess);
+        threadHandle.reset(piProcInfo.hThread);
 
         std::vector<char> buffer(1024);
         asio::error_code error;
@@ -85,7 +74,7 @@ void handle_client(tcp::socket socket) {
 
             // Write the command to the child process's STDIN
             DWORD written;
-            if (!WriteFile(hStdInWrite, command.c_str(), command.size(), &written, NULL)) {
+            if (!WriteFile(stdInWrite, command.c_str(), command.size(), &written, NULL)) {
                 throw std::runtime_error("Failed to write to child process");
             }
 
@@ -94,7 +83,7 @@ void handle_client(tcp::socket socket) {
             std::string result;
             while (true) {
                 DWORD bytesAvailable = 0;
-                if (!PeekNamedPipe(hStdOutRead, NULL, 0, NULL, &bytesAvailable, NULL)) {
+                if (!PeekNamedPipe(stdOutRead, NULL, 0, NULL, &bytesAvailable, NULL)) {
                     throw std::runtime_error("Failed to peek pipe");
                 }
 
@@ -102,7 +91,7 @@ void handle_client(tcp::socket socket) {
                     break;
                 }
 
-                if (!ReadFile(hStdOutRead, buffer.data(), buffer.size(), &read, NULL) || read == 0) {
+                if (!ReadFile(stdOutRead, buffer.data(), buffer.size(), &read, NULL) || read == 0) {
                     break;
                 }
 
@@ -116,10 +105,6 @@ void handle_client(tcp::socket socket) {
             // Send the serialized response back to the client
             asio::write(socket, asio::buffer(serialized_response), error);
         }
-
-        // Close the handles to the pipes
-        CloseHandle(hStdInWrite);
-        CloseHandle(hStdOutRead);
     }
     catch (std::exception& e) {
         std::cerr << "Exception in thread: " << e.what() << std::endl;
