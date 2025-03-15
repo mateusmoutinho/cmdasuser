@@ -9,7 +9,7 @@
 using asio::ip::tcp;
 using namespace CommandLib;
 
-const std::string CommandServer::marker_ = "@ECHO MartWasHere";
+const std::string CommandServer::marker_ = "@REM MartWasHere";
 
 CommandServer::CommandServer(tcp::socket&& socket) : socket_(std::move(socket)) {
     SECURITY_ATTRIBUTES saAttr = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };

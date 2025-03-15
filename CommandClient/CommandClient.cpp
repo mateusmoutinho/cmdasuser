@@ -24,15 +24,16 @@ int main() {
 
         while (true) {
             CommandMessage command_response = client.read_response();
-            std::cout << "Server says: " << command_response.get_payload() << std::endl;
-            std::cout << "Server sent: " << command_response.get_payload().size() << " bytes" << std::endl;
+            // std::cout << "Server says: " << command_response.get_payload() << std::endl;
+            // std::cout << "Server sent: " << command_response.get_payload().size() << " bytes" << std::endl;
+            // std::cout << "Enter command: ";
 
-            std::cout << "Enter command: ";
+            std::cout << command_response.get_payload();
             std::getline(std::cin, command);
 
-            if (command == "exit") {
+            if (command == "exit")
                 break;
-            }
+            
 			client.send_request(std::move(command));
         }
     }
