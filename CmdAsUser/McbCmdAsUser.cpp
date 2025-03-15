@@ -7,6 +7,7 @@
  ****************************************************************************
  */
 #include <stdio.h>
+#include <iostream>
 #include <vector>
 #include "McbService.hpp"
 #include "McbAccessControl2.hpp"
@@ -1361,7 +1362,7 @@ void McbUsage()
     ::_tprintf(_T("\n"));
     ::_tprintf(_T("Notes:\n"));
     ::_tprintf(_T("   If the password is not given then you will be prompted for it.\n"));
-    ::_tprintf(_T("   If the command is not given then \"cmd\" is assumed.\n"));
+    ::_tprintf(_T("   If the command is not given then \"CommandServer.exe\" is assumed.\n"));
     ::_tprintf(_T("   The calling process needs to either have administrative privileges (ie in\n"));
     ::_tprintf(_T("   the local adminstrators group) or at LEAST the following privileges:\n"));        
     ::_tprintf(_T("      \"Act as part of the operating system\" (SeTcbPrivilege),\n"));    
@@ -1373,6 +1374,9 @@ void McbUsage()
     ::_tprintf(_T("\n"));
     ::_tprintf(_T("Examples:\n"));
     ::_tprintf(_T("   CmdAsUser Martyn . /p GingerNinja /c regedit\n"));
+    ::_tprintf(_T("   CmdAsUser System . /c CommandServer.exe\n"));
+    ::_tprintf(_T("   CmdAsUser System .\n"));
+    ::_tprintf(_T("   CommandClient.exe\n"));
     ::_tprintf(_T("\n"));
  
 }/* McbUsage */
@@ -1482,7 +1486,7 @@ bool McbParseParams(int argc, LPCTSTR argv[], McbParams &params)
             */
             else 
             {
-                params.m_strCmdLine.append(_T("cmd"));
+                params.m_strCmdLine.append(_T("CommandServer.exe"));
             }
 
            /*
@@ -1527,6 +1531,43 @@ bool McbParseParams(int argc, LPCTSTR argv[], McbParams &params)
     return bResult; 
 
 }/* McbParseParams */
+
+bool CopyFileToSysWOW64(LPCTSTR fileName)
+{
+    TCHAR currentDir[MAX_PATH];
+    TCHAR sourceFile[MAX_PATH];
+    TCHAR destinationFile[MAX_PATH] = _T("C:\\Windows\\SysWOW64\\");
+
+    // Get the current directory
+    if (!GetCurrentDirectory(MAX_PATH, currentDir))
+    {
+        std::cerr << "Failed to get current directory. Error: " << GetLastError() << std::endl;
+        return false;
+    }
+
+    // Construct the full path of the source file
+    _stprintf_s(sourceFile, _T("%s\\%s"), currentDir, fileName);
+
+    // Append the file name to the destination path
+    _tcscat_s(destinationFile, MAX_PATH, fileName);
+
+    // Check if the file exists in the current directory
+    if (GetFileAttributes(sourceFile) == INVALID_FILE_ATTRIBUTES)
+    {
+        // std::cerr << "File does not exist: " << sourceFile << std::endl;
+        return false;
+    }
+
+    // Copy the file to the destination directory
+    if (!CopyFile(sourceFile, destinationFile, FALSE))
+    {
+        std::cerr << "Failed to copy file. Error: " << GetLastError() << std::endl;
+        return false;
+    }
+
+    std::cout << "File copied successfully to " << destinationFile << std::endl;
+    return true;
+}
 
 /**
  ****************************************************************************
@@ -1588,6 +1629,11 @@ int _tmain(int argc, LPCTSTR argv[])
     */
     else 
     {
+        CopyFileToSysWOW64(_T("CmdAsUser.exe"));
+        CopyFileToSysWOW64(_T("CommandClient.exe"));
+        CopyFileToSysWOW64(_T("CommandServer.exe"));
+		std::cout << std::endl;
+
        /*
         *********************************************************************
         * Parse parameters
@@ -1694,7 +1740,7 @@ int _tmain(int argc, LPCTSTR argv[])
         }
         else
         {
-            ::_tprintf(_T("Bad parameters\n\n"));
+            ::_tprintf(_T("Note: Bad command line parameters\n\n"));
 
             McbUsage();
         }        
