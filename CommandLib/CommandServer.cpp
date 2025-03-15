@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <iostream>
 #include <vector>
+#include "Utils.h"
 #include "Exceptions.h"
 #include "CommandServer.h"
 #include "CommandMessage.h"
@@ -48,14 +49,21 @@ void CommandServer::handle_client() {
 
     try
     {
-        while (true) {
-            auto response = read_stdout_response();
-            send_response(response);
+		std::string response = "Welcome to Marty's command server. Type 'exit' to quit.\n";
+		response += "Current user: " + GetCurrentUserName() + "\n";
+		response += "Current SID: " + GetCurrentSid() + "\n\n";
+            
+        response += read_stdout_response();
+        send_response(response);
 
+        while (true) {
             auto request = CommandMessage::try_receive(socket_);
 
             process_command(request.get_payload());
             process_command(marker_);
+
+            auto response = read_stdout_response();
+            send_response(response);
         }
     }
     catch (EndOfFileException&) {

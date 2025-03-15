@@ -145,11 +145,13 @@
     <ClInclude Include="Exceptions.h" />
     <ClInclude Include="HandleGuard.h" />
     <ClInclude Include="CommandMessage.h" />
+    <ClInclude Include="Utils.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CommandClient.cpp" />
     <ClCompile Include="CommandServer.cpp" />
     <ClCompile Include="CommandMessage.cpp" />
+    <ClCompile Include="Utils.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
