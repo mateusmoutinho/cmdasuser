@@ -21,7 +21,7 @@
     <ClInclude Include="HandleGuard.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="MyStruct.h">
+    <ClInclude Include="CommandMessage.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="CommandClient.h">
@@ -44,7 +44,7 @@
     <ClCompile Include="CommandClient.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="MyStruct.cpp">
+    <ClCompile Include="CommandMessage.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

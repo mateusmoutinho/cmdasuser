@@ -1,5 +1,7 @@
 #include "CommandResponse.h"
 
+using namespace CommandLib;
+
 std::string CommandResponse::serialize() const {
     return StdOut + "\0";
 }

@@ -5,8 +5,8 @@
 #include <asio.hpp>
 #include <CommandLib.h>
 
-// See <repo>/readme.md
 using asio::ip::tcp;
+using namespace CommandLib;
 
 int main() {
     try {

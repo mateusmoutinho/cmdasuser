@@ -12,8 +12,8 @@
 #include <tchar.h>
 #include <windows.h> // wsock2.h is included in CommandLib.h
 
-// See <repo>/readme.md
 using asio::ip::tcp;
+using namespace CommandLib;
 
 void handle_client(tcp::socket && socket) {
     try {

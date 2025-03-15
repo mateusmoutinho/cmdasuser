@@ -5,6 +5,7 @@
 #include "CommandResponse.h"
 
 using asio::ip::tcp;
+using namespace CommandLib;
 
 const std::string CommandServer::marker_ = "@ECHO MartWasHere";
 

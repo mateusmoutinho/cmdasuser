@@ -2,6 +2,7 @@
 #include <iostream>
 #include "CommandClient.h"
 
+using namespace CommandLib;
 using asio::ip::tcp;
 
 CommandClient::CommandClient(tcp::socket&& socket) : socket_(std::move(socket))

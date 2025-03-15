@@ -1,6 +1,6 @@
 #pragma once
 
-#include "MyStruct.h"
+#include "CommandMessage.h"
 #include "HandleGuard.h"
 #include "CommandClient.h"
 #include "CommandServer.h"
