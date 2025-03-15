@@ -2,6 +2,7 @@
 #include <iostream>
 #include <vector>
 #include "CommandServer.h"
+#include "CommandMessage.h"
 #include "CommandResponse.h"
 
 using asio::ip::tcp;
@@ -9,14 +10,21 @@ using namespace CommandLib;
 
 const std::string CommandServer::marker_ = "@ECHO MartWasHere";
 
-CommandServer::CommandServer(tcp::socket&& socket) : socket_(std::move(socket))
-{
+CommandServer::CommandServer(tcp::socket&& socket) : socket_(std::move(socket)) {
     init();
 }
 
 void CommandServer::init() {
 
-    init_pipes();
+    SECURITY_ATTRIBUTES saAttr = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
+
+    /// Create pipes for the child process's STDIN and STDOUT
+    if (!CreatePipe(stdInRead_.get_pointer(), stdInWrite_.get_pointer(), &saAttr, 0) ||
+        !SetHandleInformation(stdInWrite_, HANDLE_FLAG_INHERIT, 0) ||
+        !CreatePipe(stdOutRead_.get_pointer(), stdOutWrite_.get_pointer(), &saAttr, 0) ||
+        !SetHandleInformation(stdOutRead_, HANDLE_FLAG_INHERIT, 0)) {
+        throw std::runtime_error("Failed to create pipes");
+    }
 
     STARTUPINFO startupInfo = { sizeof(STARTUPINFO) };
     startupInfo.hStdInput = stdInRead_;
@@ -38,68 +46,70 @@ void CommandServer::init() {
     processHandle_.reset(procInfo.hProcess);
 }
 
-void CommandServer::init_pipes()
-{
-    SECURITY_ATTRIBUTES saAttr = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
-
-    /// Create pipes for the child process's STDIN and STDOUT
-    if (!CreatePipe(stdInRead_.get_pointer(), stdInWrite_.get_pointer(), &saAttr, 0) ||
-        !SetHandleInformation(stdInWrite_, HANDLE_FLAG_INHERIT, 0) ||
-        !CreatePipe(stdOutRead_.get_pointer(), stdOutWrite_.get_pointer(), &saAttr, 0) ||
-        !SetHandleInformation(stdOutRead_, HANDLE_FLAG_INHERIT, 0)) {
-        throw std::runtime_error("Failed to create pipes");
-    }
-}
-
-std::optional<std::string> CommandServer::read_request() {
-    asio::streambuf buffer;
-    asio::error_code error;
-    asio::read_until(socket_, buffer, '\0', error);
-
-    if (error == asio::error::eof) {
-        std::cout << "Connection closed by client" << std::endl;
-        return std::nullopt;
-    }
-    else if (error) {
-        throw asio::system_error(error);
-    }
-
-    std::string command;
-    std::istream is(&buffer);
-    std::getline(is, command, '\0');
-    return command;
-}
+//std::optional<std::string> CommandServer::read_request() {
+//    auto response = CommandMessage::try_receive(socket_);
+//    if (response)
+//		return response->get_payload();
+//    return std::nullopt;
+//
+//    /*asio::streambuf buffer;
+//    asio::error_code error;
+//    asio::read_until(socket_, buffer, '\0', error);
+//
+//    if (error == asio::error::eof) {
+//        std::cout << "Connection closed by client" << std::endl;
+//        return std::nullopt;
+//    }
+//    else if (error) {
+//        throw asio::system_error(error);
+//    }
+//
+//    std::string command;
+//    std::istream is(&buffer);
+//    std::getline(is, command, '\0');
+//    return command;*/
+//}
 
 void CommandServer::handle_client() {
 
-    // We use this to find the end of the command output.
-    process_command(marker_);
+    process_command(marker_); // Find the end of cmd output.
 
     while (true) {
-        auto response = read_response();
-        if (!response) {
-            throw std::runtime_error("Failed to read response");
-        }
-        send_response(*response);
+        auto response = read_stdout_response();
+        send_response(response);
 
-        auto request = read_request();
+        auto request = CommandMessage::try_receive(socket_);
+        if (!request) 
+            break;
+      
+        process_command(request->get_payload());
+        process_command(marker_);
+
+        /*auto request = read_request();
         if (!request) {
+            std::cout << "Connection closed by client" << std::endl;
             break;
         }
 		process_command(*request);
-        process_command(marker_);
+        process_command(marker_);*/
     }
+
+    std::cout << "Connection closed by client" << std::endl;
 }
 
 void CommandServer::send_response(const std::string & response)
 {
     std::cout << "Server says: [" << response << "]" << std::endl;
+    std::cout << "Server sends: " << response.size() << " bytes" <<std::endl;
 
-    CommandResponse commandResponse{ response };
+    CommandMessage commandMessage{ response, "str2" };
+    commandMessage.send(socket_);
+
+   /* CommandResponse commandResponse{ response };
     std::string serialized_response = commandResponse.serialize();
 
     asio::error_code error;
-    asio::write(socket_, asio::buffer(serialized_response), error);
+    asio::write(socket_, asio::buffer(serialized_response), error);*/
 }
 
 void CommandServer::process_command(const std::string & command)
@@ -114,7 +124,7 @@ void CommandServer::process_command(const std::string & command)
     }
 }
 
-std::optional<std::string> CommandServer::read_response() {
+std::string CommandServer::read_stdout_response() {
     DWORD read;
     std::string stdOutResponse;
     std::vector<char> output_buffer(1024 * 10);
@@ -134,10 +144,6 @@ std::optional<std::string> CommandServer::read_response() {
     size_t marker_pos = stdOutResponse.find(marker_);
     if (marker_pos != std::string::npos) {
         stdOutResponse.resize(marker_pos);
-    }
-
-    if (stdOutResponse.empty()) {
-        return std::nullopt;
     }
 
     return stdOutResponse;

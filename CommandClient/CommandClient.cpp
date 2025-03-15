@@ -23,8 +23,9 @@ int main() {
 		CommandClient client(std::move(socket));
 
         while (true) {
-            CommandResponse command_response = client.read_response();
-            std::cout << "Server says: " << command_response.StdOut << std::endl;
+            CommandMessage command_response = client.read_response();
+            std::cout << "Server says: " << command_response.get_payload() << std::endl;
+            std::cout << "Server sent: " << command_response.get_payload().size() << " bytes" << std::endl;
 
             std::cout << "Enter command: ";
             std::getline(std::cin, command);

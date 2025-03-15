@@ -3,11 +3,11 @@
 #include <string>
 
 namespace CommandLib {
-    struct CommandResponse {
+    struct CommandResponse2 {
         const std::string StdOut;
-        CommandResponse(const std::string& stdOut) : StdOut(stdOut) {}
+        CommandResponse2(const std::string& stdOut) : StdOut(stdOut) {}
 
         std::string serialize() const;
-        static CommandResponse deserialize(const std::string& data);
+        static CommandResponse2 deserialize(const std::string& data);
     };
 }

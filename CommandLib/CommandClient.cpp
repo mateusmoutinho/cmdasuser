@@ -9,15 +9,20 @@ CommandClient::CommandClient(tcp::socket&& socket) : socket_(std::move(socket))
 {
 }
 
-void CommandClient::send_request(std::string&& command)
-{
-    command += '\0';
+void CommandClient::send_request(std::string&& command) {
+	CommandMessage commandMessage{ command, "str2" };
+	commandMessage.send(socket_);
+
+    /*command += '\0';
     asio::write(socket_, asio::buffer(command));
-    std::cout << "Command sent: " << command << std::endl;
+    std::cout << "Command sent: " << command << std::endl;*/
 }
 
-CommandResponse CommandClient::read_response() {
-    asio::streambuf response;
+CommandMessage CommandClient::read_response() {
+	auto response = CommandMessage::receive(socket_);
+    return response;
+
+    /*asio::streambuf response;
     std::string serialized_response;
     std::istream response_stream(&response);
 
@@ -38,5 +43,5 @@ CommandResponse CommandClient::read_response() {
         }
     }
 
-    return CommandResponse::deserialize(serialized_response);
+    return CommandResponse::deserialize(serialized_response);*/
 }
