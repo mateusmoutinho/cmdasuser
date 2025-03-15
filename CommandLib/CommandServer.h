@@ -12,12 +12,9 @@ namespace CommandLib {
         HandleGuard processHandle_, threadHandle_;
         HandleGuard stdInRead_, stdInWrite_, stdOutRead_, stdOutWrite_;
 
-        void init();
+        std::string read_stdout_response();
         void send_response(const std::string& response);
         void process_command(const std::string& command);
-
-        std::string read_stdout_response();
-        //std::optional<std::string> read_request();
 
     public:
         CommandServer(asio::ip::tcp::socket&& socket);

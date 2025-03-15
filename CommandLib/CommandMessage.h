@@ -1,10 +1,12 @@
 #pragma once
 
 #include <string>
-#include <optional>
 
 namespace CommandLib {
     class CommandMessage {
+        std::string str2_;
+        std::string payload_;
+
     public:
         CommandMessage(const std::string& payload, const std::string& str2);
 
@@ -16,10 +18,6 @@ namespace CommandLib {
 
         static CommandMessage deserialize(const std::string& data);
         static CommandMessage receive(asio::ip::tcp::socket& socket);
-        static std::optional<CommandMessage> try_receive(asio::ip::tcp::socket& socket);
-
-    private:
-        std::string str2_;
-        std::string payload_;
+        static CommandMessage try_receive(asio::ip::tcp::socket& socket);
     };
 }

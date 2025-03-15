@@ -5,6 +5,8 @@
 namespace CommandLib {
     template <typename HandleType>
     class HandleGuardImpl {
+        HandleType handle_;
+
     public:
         explicit HandleGuardImpl(HandleType handle = nullptr) : handle_(handle) {}
 
@@ -39,9 +41,6 @@ namespace CommandLib {
                 CloseHandle(handle_);
             handle_ = handle;
         }
-
-    private:
-        HandleType handle_;
     };
 
     using HandleGuard = HandleGuardImpl<HANDLE>;

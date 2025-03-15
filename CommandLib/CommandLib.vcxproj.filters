@@ -27,17 +27,14 @@
     <ClInclude Include="CommandClient.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CommandResponse.h">
+    <ClInclude Include="CommandServer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CommandServer.h">
+    <ClInclude Include="Exceptions.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="CommandResponse.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="CommandServer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

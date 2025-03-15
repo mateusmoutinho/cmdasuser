@@ -1,5 +1,6 @@
 #include <iostream>
 #include <asio.hpp>
+#include "Exceptions.h"
 #include "CommandMessage.h"
 
 using asio::ip::tcp;
@@ -34,24 +35,25 @@ CommandMessage CommandMessage::receive(asio::ip::tcp::socket& socket) {
 
     std::istream is(&buffer);
     std::string serialized_data((std::istreambuf_iterator<char>(is)), std::istreambuf_iterator<char>());
+
     CommandMessage data = CommandMessage::deserialize(serialized_data);
     return data;
 }
 
-std::optional<CommandMessage> CommandMessage::try_receive(asio::ip::tcp::socket& socket) {
+CommandMessage CommandMessage::try_receive(asio::ip::tcp::socket& socket) {
     asio::streambuf buffer;
     asio::error_code error;
     asio::read_until(socket, buffer, '\0', error);
 
-    if (error == asio::error::eof) {
-        return std::nullopt;
-    }
-    else if (error) {
+    if (error == asio::error::eof)
+        throw EndOfFileException();
+    
+    if (error)
         throw asio::system_error(error);
-    }
 
     std::istream is(&buffer);
     std::string serialized_data((std::istreambuf_iterator<char>(is)), std::istreambuf_iterator<char>());
+
     CommandMessage data = CommandMessage::deserialize(serialized_data);
     return data;
 }

@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <iostream>
 #include <vector>
+#include "Exceptions.h"
 #include "CommandServer.h"
 #include "CommandMessage.h"
 #include "CommandResponse.h"
@@ -11,11 +12,6 @@ using namespace CommandLib;
 const std::string CommandServer::marker_ = "@ECHO MartWasHere";
 
 CommandServer::CommandServer(tcp::socket&& socket) : socket_(std::move(socket)) {
-    init();
-}
-
-void CommandServer::init() {
-
     SECURITY_ATTRIBUTES saAttr = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
 
     /// Create pipes for the child process's STDIN and STDOUT
@@ -46,55 +42,25 @@ void CommandServer::init() {
     processHandle_.reset(procInfo.hProcess);
 }
 
-//std::optional<std::string> CommandServer::read_request() {
-//    auto response = CommandMessage::try_receive(socket_);
-//    if (response)
-//		return response->get_payload();
-//    return std::nullopt;
-//
-//    /*asio::streambuf buffer;
-//    asio::error_code error;
-//    asio::read_until(socket_, buffer, '\0', error);
-//
-//    if (error == asio::error::eof) {
-//        std::cout << "Connection closed by client" << std::endl;
-//        return std::nullopt;
-//    }
-//    else if (error) {
-//        throw asio::system_error(error);
-//    }
-//
-//    std::string command;
-//    std::istream is(&buffer);
-//    std::getline(is, command, '\0');
-//    return command;*/
-//}
-
 void CommandServer::handle_client() {
 
     process_command(marker_); // Find the end of cmd output.
 
-    while (true) {
-        auto response = read_stdout_response();
-        send_response(response);
+    try
+    {
+        while (true) {
+            auto response = read_stdout_response();
+            send_response(response);
 
-        auto request = CommandMessage::try_receive(socket_);
-        if (!request) 
-            break;
-      
-        process_command(request->get_payload());
-        process_command(marker_);
+            auto request = CommandMessage::try_receive(socket_);
 
-        /*auto request = read_request();
-        if (!request) {
-            std::cout << "Connection closed by client" << std::endl;
-            break;
+            process_command(request.get_payload());
+            process_command(marker_);
         }
-		process_command(*request);
-        process_command(marker_);*/
     }
-
-    std::cout << "Connection closed by client" << std::endl;
+    catch (EndOfFileException&) {
+        std::cout << "Connection closed by client" << std::endl;
+    }
 }
 
 void CommandServer::send_response(const std::string & response)
@@ -104,12 +70,6 @@ void CommandServer::send_response(const std::string & response)
 
     CommandMessage commandMessage{ response, "str2" };
     commandMessage.send(socket_);
-
-   /* CommandResponse commandResponse{ response };
-    std::string serialized_response = commandResponse.serialize();
-
-    asio::error_code error;
-    asio::write(socket_, asio::buffer(serialized_response), error);*/
 }
 
 void CommandServer::process_command(const std::string & command)
