@@ -91,7 +91,7 @@ void CommandServer::handle_client() {
 
 void CommandServer::send_response(const std::string & response)
 {
-    std::cout << "Server says: " << response << std::endl;
+    std::cout << "Server says: [" << response << "]" << std::endl;
 
     CommandResponse commandResponse{ response };
     std::string serialized_response = commandResponse.serialize();
