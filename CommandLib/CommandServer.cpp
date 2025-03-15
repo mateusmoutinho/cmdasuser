@@ -5,18 +5,6 @@
 
 using asio::ip::tcp;
 
-bool DuplicateHandleForOverlappedIO(HandleGuard & source, HandleGuard & target)
-{
-    return DuplicateHandle(
-        GetCurrentProcess(),
-        source.get(),
-        GetCurrentProcess(),
-        target.get_pointer(),
-        0,
-        FALSE,
-        DUPLICATE_SAME_ACCESS | FILE_FLAG_OVERLAPPED) != FALSE;
-}
-
 CommandServer::CommandServer(tcp::socket&& socket) : socket_(std::move(socket))
 {
     init();
@@ -25,11 +13,10 @@ CommandServer::CommandServer(tcp::socket&& socket) : socket_(std::move(socket))
 void CommandServer::init() {
 
     init_pipes();
-    //init_overlapped_pipes();
 
     STARTUPINFO startupInfo = { sizeof(STARTUPINFO) };
     startupInfo.hStdInput = stdInRead_;
-    startupInfo.hStdError = stdErrWrite_;
+    startupInfo.hStdError = stdOutWrite_;
     startupInfo.hStdOutput = stdOutWrite_;
     startupInfo.dwFlags |= STARTF_USESTDHANDLES;
 
@@ -55,48 +42,8 @@ void CommandServer::init_pipes()
     if (!CreatePipe(stdInRead_.get_pointer(), stdInWrite_.get_pointer(), &saAttr, 0) ||
         !SetHandleInformation(stdInWrite_, HANDLE_FLAG_INHERIT, 0) ||
         !CreatePipe(stdOutRead_.get_pointer(), stdOutWrite_.get_pointer(), &saAttr, 0) ||
-        !SetHandleInformation(stdOutRead_, HANDLE_FLAG_INHERIT, 0) ||
-        !CreatePipe(stdErrRead_.get_pointer(), stdErrWrite_.get_pointer(), &saAttr, 0) ||
-        !SetHandleInformation(stdErrRead_, HANDLE_FLAG_INHERIT, 0)) {
+        !SetHandleInformation(stdOutRead_, HANDLE_FLAG_INHERIT, 0)) {
         throw std::runtime_error("Failed to create pipes");
-    }
-}
-
-void CommandServer::init_overlapped_pipes()
-{
-    SECURITY_ATTRIBUTES saAttr = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
-
-    // Create the stdout and stderr pipes
-    HandleGuard tempStdOutRead, tempStdOutWrite;
-    HandleGuard tempStdErrRead, tempStdErrWrite;
-	
-	    // Create pipes for the child process's STDIN
-    if (!CreatePipe(stdInRead_.get_pointer(), stdInWrite_.get_pointer(), &saAttr, 0) ||
-        !SetHandleInformation(stdInWrite_, HANDLE_FLAG_INHERIT, 0)) {
-        throw std::runtime_error("Failed to create pipes for STDIN");
-    }
-
-    if (!CreatePipe(tempStdOutRead.get_pointer(), tempStdOutWrite.get_pointer(), &saAttr, 0) ||
-        !SetHandleInformation(tempStdOutRead.get(), HANDLE_FLAG_INHERIT, 0) ||
-        !CreatePipe(tempStdErrRead.get_pointer(), tempStdErrWrite.get_pointer(), &saAttr, 0) ||
-        !SetHandleInformation(tempStdErrRead.get(), HANDLE_FLAG_INHERIT, 0)) {
-        throw std::runtime_error("Failed to create pipes for STDOUT and STDERR");
-    }
-
-    // Duplicate the handles to create overlapped handles
-    if (!DuplicateHandleForOverlappedIO(tempStdOutRead, stdOutRead_) ||
-        !DuplicateHandleForOverlappedIO(tempStdOutWrite, stdOutWrite_) ||
-        !DuplicateHandleForOverlappedIO(tempStdErrRead, stdErrRead_) ||
-        !DuplicateHandleForOverlappedIO(tempStdErrWrite, stdErrWrite_)) {
-        throw std::runtime_error("Failed to duplicate handles for overlapped I/O");
-    }
-
-    // Set the duplicated handles to be inheritable
-    if (!SetHandleInformation(stdOutRead_.get(), HANDLE_FLAG_INHERIT, 0) ||
-        !SetHandleInformation(stdOutWrite_.get(), HANDLE_FLAG_INHERIT, 0) ||
-        !SetHandleInformation(stdErrRead_.get(), HANDLE_FLAG_INHERIT, 0) ||
-        !SetHandleInformation(stdErrWrite_.get(), HANDLE_FLAG_INHERIT, 0)) {
-        throw std::runtime_error("Failed to set handle information for overlapped I/O");
     }
 }
 
@@ -125,7 +72,6 @@ void CommandServer::handle_client() {
     const DWORD sleep_interval_ms = 200;
 
     while (true) {
-        //auto response = read_response2(10000);
         auto response = read_response(max_retries, sleep_interval_ms);
         if (!response) {
             throw std::runtime_error("Failed to read response");
@@ -140,13 +86,11 @@ void CommandServer::handle_client() {
     }
 }
 
-void CommandServer::send_response(std::pair<std::string, std::string> response)
+void CommandServer::send_response(const std::string & response)
 {
-    auto& [stdOutResponse, stdErrResponse] = response;
-    std::cout << "StdOut: " << stdOutResponse << std::endl;
-    std::cout << "StdError: " << stdErrResponse << std::endl;
+    std::cout << "Server says: " << response << std::endl;
 
-    CommandResponse commandResponse{ stdOutResponse };
+    CommandResponse commandResponse{ response };
     std::string serialized_response = commandResponse.serialize();
 
     asio::error_code error;
@@ -159,6 +103,7 @@ void CommandServer::process_request(std::string && command)
 
     // Append a newline character to the command to signal cmd.exe to process it
     command += "\n";
+	command += "ECHO MartWasHere\n";
 
     // Write the command to the child process's STDIN
     DWORD written;
@@ -167,197 +112,13 @@ void CommandServer::process_request(std::string && command)
     }
 }
 
-std::optional<std::pair<std::string, std::string>> CommandServer::read_response2(DWORD timeout_ms) {
+std::optional<std::string> CommandServer::read_response() {
     DWORD read;
-    std::string stdErrResponse;
     std::string stdOutResponse;
     std::vector<char> output_buffer(1024 * 10);
 
-    HandleGuard overlappedStdOutEvent(CreateEvent(NULL, TRUE, FALSE, NULL));
-    HandleGuard overlappedStdErrEvent(CreateEvent(NULL, TRUE, FALSE, NULL));
-
-    if (!overlappedStdOutEvent.get() || !overlappedStdErrEvent.get()) {
-        throw std::runtime_error("Failed to create events");
-    }
-
-    OVERLAPPED overlappedStdOut = { 0 };
-    OVERLAPPED overlappedStdErr = { 0 };
-    overlappedStdOut.hEvent = overlappedStdOutEvent.get();
-    overlappedStdErr.hEvent = overlappedStdErrEvent.get();
-
-    while (true) {
-        // Start asynchronous read from stdout pipe
-        if (!ReadFile(stdOutRead_, output_buffer.data(), output_buffer.size(), &read, &overlappedStdOut)) {
-            if (GetLastError() != ERROR_IO_PENDING) {
-                throw std::runtime_error("Failed to read stdout pipe");
-            }
-        }
-
-        // Start asynchronous read from stderr pipe
-        if (!ReadFile(stdErrRead_, output_buffer.data(), output_buffer.size(), &read, &overlappedStdErr)) {
-            if (GetLastError() != ERROR_IO_PENDING) {
-                throw std::runtime_error("Failed to read stderr pipe");
-            }
-        }
-
-        // Wait for either read to complete or timeout
-        HANDLE events[] = { overlappedStdOut.hEvent, overlappedStdErr.hEvent };
-        DWORD wait_result = WaitForMultipleObjects(2, events, FALSE, timeout_ms);
-        switch (wait_result) {
-        case WAIT_OBJECT_0: // stdOutRead_ is signaled
-            if (!GetOverlappedResult(stdOutRead_, &overlappedStdOut, &read, FALSE)) {
-                throw std::runtime_error("Failed to get overlapped result for stdout pipe");
-            }
-            if (read > 0) {
-                stdOutResponse.append(output_buffer.data(), read);
-            }
-            break;
-
-        case WAIT_OBJECT_0 + 1: // stdErrRead_ is signaled
-            if (!GetOverlappedResult(stdErrRead_, &overlappedStdErr, &read, FALSE)) {
-                throw std::runtime_error("Failed to get overlapped result for stderr pipe");
-            }
-            if (read > 0) {
-                stdErrResponse.append(output_buffer.data(), read);
-            }
-            break;
-
-        case WAIT_TIMEOUT: // Timeout occurred
-            std::cerr << "Read response timeout" << std::endl;
-            return std::nullopt;
-
-        default:
-            throw std::runtime_error("WaitForMultipleObjects failed");
-        }
-
-        // If both pipes are done reading, exit the loop
-        if (GetLastError() == ERROR_BROKEN_PIPE) {
-            break;
-        }
-    }
-
-    if (stdOutResponse.empty() && stdErrResponse.empty()) {
-        return std::nullopt;
-    }
-
-    return std::make_pair(std::move(stdOutResponse), std::move(stdErrResponse));
-}
-
-std::optional<std::pair<std::string, std::string>> CommandServer::read_response(DWORD timeout_ms) {
-    DWORD read;
-    std::string stdErrResponse;
-    std::string stdOutResponse;
-    std::vector<char> output_buffer(1024 * 10);
-
-    HANDLE handles[] = { stdOutRead_.get(), stdErrRead_.get() };
-
-    while (true) {
-        DWORD wait_result = WaitForMultipleObjects(2, handles, FALSE, timeout_ms);
-        switch (wait_result) {
-        case WAIT_OBJECT_0: // stdOutRead_ is signaled
-            if (!ReadFile(stdOutRead_, output_buffer.data(), output_buffer.size(), &read, NULL)) {
-                if (GetLastError() == ERROR_BROKEN_PIPE) {
-                    break; // Pipe done reading
-                }
-                else {
-                    throw std::runtime_error("Failed to read stdout pipe");
-                }
-            }
-            if (read > 0) {
-                stdOutResponse.append(output_buffer.data(), read);
-            }
-            break;
-
-        case WAIT_OBJECT_0 + 1: // stdErrRead_ is signaled
-            if (!ReadFile(stdErrRead_, output_buffer.data(), output_buffer.size(), &read, NULL)) {
-                if (GetLastError() == ERROR_BROKEN_PIPE) {
-                    break; // Pipe done reading
-                }
-                else {
-                    throw std::runtime_error("Failed to read stderr pipe");
-                }
-            }
-            if (read > 0) {
-                stdErrResponse.append(output_buffer.data(), read);
-            }
-            break;
-
-        case WAIT_TIMEOUT: // Timeout occurred
-            std::cerr << "Read response timeout" << std::endl;
-            return std::nullopt;
-
-        default:
-            throw std::runtime_error("WaitForMultipleObjects failed");
-        }
-
-        // If both pipes are done reading, exit the loop
-        if (GetLastError() == ERROR_BROKEN_PIPE) {
-            break;
-        }
-    }
-
-    if (stdOutResponse.empty() && stdErrResponse.empty()) {
-        return std::nullopt;
-    }
-
-    return std::make_pair(std::move(stdOutResponse), std::move(stdErrResponse));
-}
-
-std::optional<std::pair<std::string, std::string>> CommandServer::blocking_read_response() {
-    DWORD read;
-    std::string stdErrResponse;
-    std::string stdOutResponse;
-    std::vector<char> output_buffer(1024 * 10);
-
-    while (true) {
-        // Read from stdout pipe
-        if (!ReadFile(stdOutRead_, output_buffer.data(), output_buffer.size(), &read, NULL)) {
-            if (GetLastError() == ERROR_BROKEN_PIPE) {
-                break; // Pipe done reading
-            }
-            else {
-                throw std::runtime_error("Failed to read stdout pipe");
-            }
-        }
-        if (read > 0) {
-            stdOutResponse.append(output_buffer.data(), read);
-        }
-
-        // Read from stderr pipe
-        if (!ReadFile(stdErrRead_, output_buffer.data(), output_buffer.size(), &read, NULL)) {
-            if (GetLastError() == ERROR_BROKEN_PIPE) {
-                break; // Pipe done reading
-            }
-            else {
-                throw std::runtime_error("Failed to read stderr pipe");
-            }
-        }
-        if (read > 0) {
-            stdErrResponse.append(output_buffer.data(), read);
-        }
-
-        // If both pipes are done reading, exit the loop
-        if (GetLastError() == ERROR_BROKEN_PIPE) {
-            break;
-        }
-    }
-
-    if (stdOutResponse.empty() && stdErrResponse.empty()) {
-        return std::nullopt;
-    }
-
-    return std::make_pair(std::move(stdOutResponse), std::move(stdErrResponse));
-}
-
-std::optional<std::pair<std::string, std::string>> CommandServer::read_response() {
-    DWORD read;
-    std::string stdErrResponse;
-    std::string stdOutResponse;
-    std::vector<char> output_buffer(1024 * 10);
-
-    DWORD stdErrBytes = 1;
     DWORD stdOutBytes = 1;
-    while (stdErrBytes != 0 || stdOutBytes != 0) {
+    while (stdOutBytes != 0) {
         if (!PeekNamedPipe(stdOutRead_, NULL, 0, NULL, &stdOutBytes, NULL)) {
             throw std::runtime_error("Failed to peek stdout pipe");
         }
@@ -371,30 +132,16 @@ std::optional<std::pair<std::string, std::string>> CommandServer::read_response(
                     stdOutResponse.append(output_buffer.data(), read);
             }
         }
-
-        if (!PeekNamedPipe(stdErrRead_, NULL, 0, NULL, &stdErrBytes, NULL)) {
-            throw std::runtime_error("Failed to peek stderr pipe");
-        }
-
-        if (stdErrBytes != 0) {
-            if (!ReadFile(stdErrRead_, output_buffer.data(), output_buffer.size(), &read, NULL))
-                stdErrBytes = 0;
-            else
-            {
-                if (read != 0)
-                    stdErrResponse.append(output_buffer.data(), read);
-            }
-        }
     }
 
-    if (stdOutResponse.empty() && stdErrResponse.empty()) {
+    if (stdOutResponse.empty()) {
         return std::nullopt;
     }
 
-    return std::make_pair(std::move(stdOutResponse), std::move(stdErrResponse));
+    return stdOutResponse;
 }
 
-std::optional<std::pair<std::string, std::string>> CommandServer::read_response(int max_retries, DWORD sleep_interval_ms) {
+std::optional<std::string> CommandServer::read_response(int max_retries, DWORD sleep_interval_ms) {
 	for (int i = 0; i < max_retries; i++) {
 		auto response = read_response();
 		if (response) {

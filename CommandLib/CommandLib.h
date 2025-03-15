@@ -27,20 +27,16 @@ public:
 class CommandServer {
     asio::ip::tcp::socket socket_;
     HandleGuard processHandle_, threadHandle_;
-    HandleGuard stdInRead_, stdInWrite_, stdOutRead_, stdErrRead_, stdOutWrite_, stdErrWrite_;
+    HandleGuard stdInRead_, stdInWrite_, stdOutRead_, stdOutWrite_;
 
     void init();
     void init_pipes();
-    void init_overlapped_pipes();
     void process_request(std::string&& command);
-    void send_response(std::pair<std::string, std::string> response);
+    void send_response(const std::string & response);
 
     std::optional<std::string> read_request();
-    std::optional<std::pair<std::string, std::string>> read_response();
-    std::optional<std::pair<std::string, std::string>> blocking_read_response();
-    std::optional<std::pair<std::string, std::string>> read_response(DWORD timeoutMs);
-    std::optional<std::pair<std::string, std::string>> read_response2(DWORD timeoutMs);
-    std::optional<std::pair<std::string, std::string>> read_response(int max_retries, DWORD sleep_interval_ms);
+    std::optional<std::string> read_response();
+    std::optional<std::string> read_response(int max_retries, DWORD sleep_interval_ms);
 
 public:
     CommandServer(asio::ip::tcp::socket&& socket);
