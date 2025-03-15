@@ -1,7 +1,8 @@
 #include <cstdio>
 #include <iostream>
 #include <vector>
-#include "CommandLib.h"
+#include "CommandServer.h"
+#include "CommandResponse.h"
 
 using asio::ip::tcp;
 

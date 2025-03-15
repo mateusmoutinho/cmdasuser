@@ -21,15 +21,30 @@
     <ClInclude Include="HandleGuard.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="MyStruct.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CommandClient.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CommandResponse.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CommandServer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="CommandLib.cpp">
+    <ClCompile Include="CommandResponse.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="CommandServer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="CommandClient.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MyStruct.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

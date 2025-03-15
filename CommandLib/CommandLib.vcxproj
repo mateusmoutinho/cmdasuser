@@ -138,13 +138,18 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="CommandClient.h" />
     <ClInclude Include="CommandLib.h" />
+    <ClInclude Include="CommandResponse.h" />
+    <ClInclude Include="CommandServer.h" />
     <ClInclude Include="HandleGuard.h" />
+    <ClInclude Include="MyStruct.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CommandClient.cpp" />
-    <ClCompile Include="CommandLib.cpp" />
+    <ClCompile Include="CommandResponse.cpp" />
     <ClCompile Include="CommandServer.cpp" />
+    <ClCompile Include="MyStruct.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

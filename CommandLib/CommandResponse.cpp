@@ -1,4 +1,4 @@
-#include "CommandLib.h"
+#include "CommandResponse.h"
 
 std::string CommandResponse::serialize() const {
     return StdOut + "\0";
