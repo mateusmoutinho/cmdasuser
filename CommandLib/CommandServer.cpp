@@ -5,7 +5,7 @@
 
 using asio::ip::tcp;
 
-const std::string CommandServer::marker_ = "MartWasHere";
+const std::string CommandServer::marker_ = "@ECHO MartWasHere";
 
 CommandServer::CommandServer(tcp::socket&& socket) : socket_(std::move(socket))
 {
@@ -71,8 +71,7 @@ std::optional<std::string> CommandServer::read_request() {
 void CommandServer::handle_client() {
 
     // We use this to find the end of the command output.
-	const std::string echo_marker = "ECHO " + marker_; 
-    process_command(echo_marker);
+    process_command(marker_);
 
     while (true) {
         auto response = read_response();
@@ -86,7 +85,7 @@ void CommandServer::handle_client() {
             break;
         }
 		process_command(*request);
-        process_command(echo_marker);
+        process_command(marker_);
     }
 }
 
@@ -119,28 +118,17 @@ std::optional<std::string> CommandServer::read_response() {
     std::vector<char> output_buffer(1024 * 10);
 
     while (true) {
-        DWORD stdOutBytes = 0;
-        if (!PeekNamedPipe(stdOutRead_, NULL, 0, NULL, &stdOutBytes, NULL)) {
-            throw std::runtime_error("Failed to peek stdout pipe");
+        if (!ReadFile(stdOutRead_, output_buffer.data(), output_buffer.size(), &read, NULL) || read == 0) {
+            throw std::runtime_error("Failed to read stdout pipe");
         }
-
-        if (stdOutBytes != 0) {
-            if (!ReadFile(stdOutRead_, output_buffer.data(), output_buffer.size(), &read, NULL)) {
-                throw std::runtime_error("Failed to read stdout pipe");
-            }
-            if (read > 0) {
-                stdOutResponse.append(output_buffer.data(), read);
-                if (stdOutResponse.find(marker_) != std::string::npos) {
-                    break;
-                }
-            }
-        }
-        else {
-            std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Sleep for a short interval before retrying
+        
+        stdOutResponse.append(output_buffer.data(), read);
+        if (stdOutResponse.find(marker_) != std::string::npos) {
+            break;
         }
     }
 
-    // Remove the marker from the response
+	// Discard the marker   
     size_t marker_pos = stdOutResponse.find(marker_);
     if (marker_pos != std::string::npos) {
         stdOutResponse.resize(marker_pos);
