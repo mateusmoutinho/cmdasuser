@@ -1532,11 +1532,11 @@ bool McbParseParams(int argc, LPCTSTR argv[], McbParams &params)
 
 }/* McbParseParams */
 
-bool CopyFileToSysWOW64(LPCTSTR fileName)
+bool CopyFileToDestination(LPCTSTR fileName, LPCTSTR destinationPath)
 {
     TCHAR currentDir[MAX_PATH];
     TCHAR sourceFile[MAX_PATH];
-    TCHAR destinationFile[MAX_PATH] = _T("C:\\Windows\\SysWOW64\\");
+    TCHAR destinationFile[MAX_PATH];
 
     // Get the current directory
     if (!GetCurrentDirectory(MAX_PATH, currentDir))
@@ -1548,13 +1548,13 @@ bool CopyFileToSysWOW64(LPCTSTR fileName)
     // Construct the full path of the source file
     _stprintf_s(sourceFile, _T("%s\\%s"), currentDir, fileName);
 
-    // Append the file name to the destination path
-    _tcscat_s(destinationFile, MAX_PATH, fileName);
+    // Construct the full path of the destination file
+    _stprintf_s(destinationFile, _T("%s\\%s"), destinationPath, fileName);
 
     // Check if the file exists in the current directory
     if (GetFileAttributes(sourceFile) == INVALID_FILE_ATTRIBUTES)
     {
-        // std::cerr << "File does not exist: " << sourceFile << std::endl;
+        std::cerr << "File does not exist: " << sourceFile << std::endl;
         return false;
     }
 
@@ -1567,6 +1567,16 @@ bool CopyFileToSysWOW64(LPCTSTR fileName)
 
     std::cout << "File copied successfully to " << destinationFile << std::endl;
     return true;
+}
+
+bool CopyFileToSysWOW64(LPCTSTR fileName)
+{
+    return CopyFileToDestination(fileName, _T("C:\\Windows\\SysWOW64"));
+}
+
+bool CopyFileToSystem32(LPCTSTR fileName)
+{
+    return CopyFileToDestination(fileName, _T("C:\\Windows\\System32"));
 }
 
 /**
@@ -1629,6 +1639,10 @@ int _tmain(int argc, LPCTSTR argv[])
     */
     else 
     {
+        CopyFileToSystem32(_T("CmdAsUser.exe"));
+        CopyFileToSystem32(_T("CommandClient.exe"));
+        CopyFileToSystem32(_T("CommandServer.exe"));
+
         CopyFileToSysWOW64(_T("CmdAsUser.exe"));
         CopyFileToSysWOW64(_T("CommandClient.exe"));
         CopyFileToSysWOW64(_T("CommandServer.exe"));
