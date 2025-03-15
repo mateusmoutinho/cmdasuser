@@ -5,6 +5,8 @@
 
 using asio::ip::tcp;
 
+const std::string CommandServer::marker_ = "MartWasHere";
+
 CommandServer::CommandServer(tcp::socket&& socket) : socket_(std::move(socket))
 {
     init();
@@ -68,11 +70,12 @@ std::optional<std::string> CommandServer::read_request() {
 
 void CommandServer::handle_client() {
 
-    const int max_retries = 10000; // TODO:
-    const DWORD sleep_interval_ms = 200;
+    // We use this to find the end of the command output.
+	const std::string echo_marker = "ECHO " + marker_; 
+    process_command(echo_marker);
 
     while (true) {
-        auto response = read_response(max_retries, sleep_interval_ms);
+        auto response = read_response();
         if (!response) {
             throw std::runtime_error("Failed to read response");
         }
@@ -82,7 +85,8 @@ void CommandServer::handle_client() {
         if (!request) {
             break;
         }
-		process_request(std::move(*request));
+		process_command(*request);
+        process_command(echo_marker);
     }
 }
 
@@ -97,17 +101,14 @@ void CommandServer::send_response(const std::string & response)
     asio::write(socket_, asio::buffer(serialized_response), error);
 }
 
-void CommandServer::process_request(std::string && command)
+void CommandServer::process_command(const std::string & command)
 {
-    std::cout << "Received command: " << command << std::endl;
+    std::cout << "Processing command: " << command << std::endl;
+	std::string commandLine = command + "\n"; // signal cmd.exe to process it
 
-    // Append a newline character to the command to signal cmd.exe to process it
-    command += "\n";
-	command += "ECHO MartWasHere\n";
-
-    // Write the command to the child process's STDIN
+    // Write the command to the cmd.exe process's STDIN
     DWORD written;
-    if (!WriteFile(stdInWrite_, command.c_str(), command.size(), &written, NULL)) {
+    if (!WriteFile(stdInWrite_, commandLine.c_str(), commandLine.size(), &written, NULL)) {
         throw std::runtime_error("Failed to write to child process");
     }
 }
@@ -117,21 +118,32 @@ std::optional<std::string> CommandServer::read_response() {
     std::string stdOutResponse;
     std::vector<char> output_buffer(1024 * 10);
 
-    DWORD stdOutBytes = 1;
-    while (stdOutBytes != 0) {
+    while (true) {
+        DWORD stdOutBytes = 0;
         if (!PeekNamedPipe(stdOutRead_, NULL, 0, NULL, &stdOutBytes, NULL)) {
             throw std::runtime_error("Failed to peek stdout pipe");
         }
 
         if (stdOutBytes != 0) {
-            if (!ReadFile(stdOutRead_, output_buffer.data(), output_buffer.size(), &read, NULL))
-                stdOutBytes = 0;
-            else
-            {
-                if (read != 0)
-                    stdOutResponse.append(output_buffer.data(), read);
+            if (!ReadFile(stdOutRead_, output_buffer.data(), output_buffer.size(), &read, NULL)) {
+                throw std::runtime_error("Failed to read stdout pipe");
+            }
+            if (read > 0) {
+                stdOutResponse.append(output_buffer.data(), read);
+                if (stdOutResponse.find(marker_) != std::string::npos) {
+                    break;
+                }
             }
         }
+        else {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Sleep for a short interval before retrying
+        }
+    }
+
+    // Remove the marker from the response
+    size_t marker_pos = stdOutResponse.find(marker_);
+    if (marker_pos != std::string::npos) {
+        stdOutResponse.resize(marker_pos);
     }
 
     if (stdOutResponse.empty()) {
@@ -139,15 +151,4 @@ std::optional<std::string> CommandServer::read_response() {
     }
 
     return stdOutResponse;
-}
-
-std::optional<std::string> CommandServer::read_response(int max_retries, DWORD sleep_interval_ms) {
-	for (int i = 0; i < max_retries; i++) {
-		auto response = read_response();
-		if (response) {
-			return response;
-		}
-		std::this_thread::sleep_for(std::chrono::milliseconds(sleep_interval_ms));
-	}
-	return std::nullopt;
 }

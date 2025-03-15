@@ -25,18 +25,18 @@ public:
 };
 
 class CommandServer {
+    static const std::string marker_;
     asio::ip::tcp::socket socket_;
     HandleGuard processHandle_, threadHandle_;
     HandleGuard stdInRead_, stdInWrite_, stdOutRead_, stdOutWrite_;
 
     void init();
     void init_pipes();
-    void process_request(std::string&& command);
     void send_response(const std::string & response);
+    void process_command(const std::string & command);
 
     std::optional<std::string> read_request();
     std::optional<std::string> read_response();
-    std::optional<std::string> read_response(int max_retries, DWORD sleep_interval_ms);
 
 public:
     CommandServer(asio::ip::tcp::socket&& socket);
