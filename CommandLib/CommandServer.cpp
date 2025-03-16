@@ -10,7 +10,17 @@
 using asio::ip::tcp;
 using namespace CommandLib;
 
-const std::string CommandServer::marker_ = "@REM MartWasHere";
+//std::string build_marker()
+//{
+//    const std::string marker = "@REM MartWasHere";
+//    std::string marker_with_backspaces = marker;
+//    for (size_t i = 0; i < marker.size(); ++i) {
+//        marker_with_backspaces += '\b';
+//    }
+//    return marker_with_backspaces;
+//}
+
+const std::string CommandServer::eyecatcher_ = "@REM MartWasHere2"; //build_marker();
 
 CommandServer::CommandServer(tcp::socket&& socket) : socket_(std::move(socket)) {
     SECURITY_ATTRIBUTES saAttr = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
@@ -43,9 +53,28 @@ CommandServer::CommandServer(tcp::socket&& socket) : socket_(std::move(socket)) 
     processHandle_.reset(procInfo.hProcess);
 }
 
+void CommandServer::send_eyecatcher() {
+
+    std::string command = eyecatcher_;
+    for (size_t i = 0; i < eyecatcher_.size(); ++i)
+        command += '\b';
+
+    CommandMessage commandMessage{ command, "str2" };
+    commandMessage.send(socket_);
+}
+
+void CommandServer::send_response(const std::string & response)
+{
+    std::cout << "Server says: [" << response << "]" << std::endl;
+    std::cout << "Server sends: " << response.size() << " bytes" <<std::endl;
+
+    CommandMessage commandMessage{ response, "str2" };
+    commandMessage.send(socket_);
+}
+
 void CommandServer::handle_client() {
 
-    process_command(marker_); // Find the end of cmd output.
+    process_command(eyecatcher_); // Find the end of cmd output.
 
     try
     {
@@ -60,7 +89,7 @@ void CommandServer::handle_client() {
             auto request = CommandMessage::try_receive(socket_);
 
             process_command(request.get_payload());
-            process_command(marker_);
+            send_eyecatcher();
 
             auto response = read_stdout_response();
             send_response(response);
@@ -69,15 +98,6 @@ void CommandServer::handle_client() {
     catch (EndOfFileException&) {
         std::cout << "Connection closed by client" << std::endl;
     }
-}
-
-void CommandServer::send_response(const std::string & response)
-{
-    std::cout << "Server says: [" << response << "]" << std::endl;
-    std::cout << "Server sends: " << response.size() << " bytes" <<std::endl;
-
-    CommandMessage commandMessage{ response, "str2" };
-    commandMessage.send(socket_);
 }
 
 void CommandServer::process_command(const std::string & command)
@@ -103,13 +123,13 @@ std::string CommandServer::read_stdout_response() {
         }
         
         stdOutResponse.append(output_buffer.data(), read);
-        if (stdOutResponse.find(marker_) != std::string::npos) {
+        if (stdOutResponse.find(eyecatcher_) != std::string::npos) {
             break;
         }
     }
 
 	// Discard the marker   
-    size_t marker_pos = stdOutResponse.find(marker_);
+    size_t marker_pos = stdOutResponse.find(eyecatcher_);
     if (marker_pos != std::string::npos) {
         stdOutResponse.resize(marker_pos);
     }
