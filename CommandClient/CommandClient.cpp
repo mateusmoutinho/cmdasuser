@@ -8,6 +8,30 @@
 using asio::ip::tcp;
 using namespace CommandLib;
 
+std::string get_command_input() {
+    std::string command;
+    while (true) {
+        std::getline(std::cin, command);
+
+        if (!std::cin.fail() || std::cin.eof()) {
+            break;
+        }
+
+        if (std::cin.fail()) {
+            std::cin.clear();
+            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        }
+        /*else 
+            break;*/
+
+        /*else if (std::cin.eof()) {
+            break;
+        }*/
+    }
+    return command;
+
+}
+
 int main() {
     try {
         // std::this_thread::sleep_for(std::chrono::seconds(10));
@@ -19,8 +43,7 @@ int main() {
         tcp::socket socket(io_context);
         asio::connect(socket, endpoints);
 
-        std::string command;
-		CommandClient client(std::move(socket));
+		CommandClient client(io_context, std::move(socket));
         CommandClient::set_signal_handler(&client);
 
         while (true) {
@@ -30,12 +53,15 @@ int main() {
             // std::cout << "Enter command: ";
 
             std::cout << command_response.get_payload();
-            std::getline(std::cin, command);
+
+            std::string command;
+			while (command.empty())
+				command = get_command_input();
 
             if (command == "exit")
                 break;
-            
-			client.send_request(std::move(command));
+
+			client.send_request(command);
         }
 
         CommandClient::set_signal_handler(nullptr);
