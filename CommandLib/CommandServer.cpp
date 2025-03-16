@@ -3,6 +3,7 @@
 #include <vector>
 #include "Utils.h"
 #include "Exceptions.h"
+#include "CommandClient.h"
 #include "CommandServer.h"
 #include "CommandMessage.h"
 #include "CommandResponse.h"
@@ -43,6 +44,16 @@ CommandServer::CommandServer(tcp::socket&& socket) : socket_(std::move(socket)) 
     processHandle_.reset(procInfo.hProcess);
 }
 
+bool CommandServer::try_handle_signals(const std::string& command) {
+	if (command == CommandClient::Ctrl_C) {
+        if (GenerateConsoleCtrlEvent(CTRL_C_EVENT, GetProcessId(processHandle_.get())))
+            return true;
+	    throw std::runtime_error("Failed to send Ctrl-C event");
+	}
+
+    return false;
+}
+
 void CommandServer::handle_client() {
 
     process_command(marker_); // Find the end of cmd output.
@@ -58,9 +69,12 @@ void CommandServer::handle_client() {
 
         while (true) {
             auto request = CommandMessage::try_receive(socket_);
+            std::cout << "Client says: [" << request.get_payload() << "]" << std::endl;
 
-            process_command(request.get_payload());
-            process_command(marker_);
+            if (!try_handle_signals(request.get_payload())) {
+                process_command(request.get_payload());
+                process_command(marker_);
+            }
 
             auto response = read_stdout_response();
             send_response(response);

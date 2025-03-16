@@ -15,6 +15,7 @@ namespace CommandLib {
         std::string read_stdout_response();
         void send_response(const std::string& response);
         void process_command(const std::string& command);
+        bool try_handle_signals(const std::string& command);
 
     public:
         CommandServer(asio::ip::tcp::socket&& socket);

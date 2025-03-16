@@ -21,6 +21,7 @@ int main() {
 
         std::string command;
 		CommandClient client(std::move(socket));
+        CommandClient::set_signal_handler(&client);
 
         while (true) {
             CommandMessage command_response = client.read_response();
@@ -36,6 +37,8 @@ int main() {
             
 			client.send_request(std::move(command));
         }
+
+        CommandClient::set_signal_handler(nullptr);
     }
     catch (std::exception& e) {
         std::cerr << "Exception: " << e.what() << std::endl;
