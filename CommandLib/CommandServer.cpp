@@ -23,126 +23,173 @@ using namespace CommandLib;
 const std::string CommandServer::eyecatcher_ = "@REM MartWasHere"; //build_marker();
 
 CommandServer::CommandServer(tcp::socket&& socket) : socket_(std::move(socket)) {
-    SECURITY_ATTRIBUTES saAttr = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
+	SECURITY_ATTRIBUTES saAttr = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
 
-    /// Create pipes for the child process's STDIN and STDOUT
-    if (!CreatePipe(stdInRead_.get_pointer(), stdInWrite_.get_pointer(), &saAttr, 0) ||
-        !SetHandleInformation(stdInWrite_, HANDLE_FLAG_INHERIT, 0) ||
-        !CreatePipe(stdOutRead_.get_pointer(), stdOutWrite_.get_pointer(), &saAttr, 0) ||
-        !SetHandleInformation(stdOutRead_, HANDLE_FLAG_INHERIT, 0)) {
-        throw std::runtime_error("Failed to create pipes");
-    }
+	/// Create pipes for the child process's STDIN and STDOUT
+	if (!CreatePipe(stdInRead_.get_pointer(), stdInWrite_.get_pointer(), &saAttr, 0) ||
+		!SetHandleInformation(stdInWrite_, HANDLE_FLAG_INHERIT, 0) ||
+		!CreatePipe(stdOutRead_.get_pointer(), stdOutWrite_.get_pointer(), &saAttr, 0) ||
+		!SetHandleInformation(stdOutRead_, HANDLE_FLAG_INHERIT, 0)) {
+		throw std::runtime_error("Failed to create pipes");
+	}
 
-    STARTUPINFO startupInfo = { sizeof(STARTUPINFO) };
-    startupInfo.hStdInput = stdInRead_;
-    startupInfo.hStdError = stdOutWrite_;
-    startupInfo.hStdOutput = stdOutWrite_;
-    startupInfo.dwFlags |= STARTF_USESTDHANDLES;
+	STARTUPINFO startupInfo = { sizeof(STARTUPINFO) };
+	startupInfo.hStdInput = stdInRead_;
+	startupInfo.hStdError = stdOutWrite_;
+	startupInfo.hStdOutput = stdOutWrite_;
+	startupInfo.dwFlags |= STARTF_USESTDHANDLES;
 
-    std::string cmd = "cmd.exe";
-    std::vector<TCHAR> command_line;
-    command_line.assign(cmd.begin(), cmd.end());
-    command_line.push_back('\0'); // Add null terminator
+	std::string cmd = "cmd.exe";
+	std::vector<TCHAR> command_line;
+	command_line.assign(cmd.begin(), cmd.end());
+	command_line.push_back('\0'); // Add null terminator
 
-    PROCESS_INFORMATION procInfo;
-    if (!CreateProcess(NULL, &command_line[0], NULL, NULL, TRUE, 0, NULL, NULL, &startupInfo, &procInfo)) {
-        throw std::runtime_error("Failed to create process");
-    }
+	PROCESS_INFORMATION procInfo;
+	if (!CreateProcess(NULL, &command_line[0], NULL, NULL, TRUE, 0, NULL, NULL, &startupInfo, &procInfo)) {
+		throw std::runtime_error("Failed to create process");
+	}
 
-    threadHandle_.reset(procInfo.hThread);
-    processHandle_.reset(procInfo.hProcess);
+	threadHandle_.reset(procInfo.hThread);
+	processHandle_.reset(procInfo.hProcess);
 }
 
 void CommandServer::send_delete_eyecatcher() {
 
-    std::string command;
-    for (size_t i = 0; i < eyecatcher_.size(); ++i)
-        command += '\b';
+	std::string command;
+	for (size_t i = 0; i < eyecatcher_.size(); ++i)
+		command += '\b';
 
-    process_command(command);
+	process_command(command);
 }
 
 void CommandServer::send_eyecatcher() {
-    /*std::string command = eyecatcher_;
-    for (size_t i = 0; i < eyecatcher_.size(); ++i)
-        command += '\b';
+	/*std::string command = eyecatcher_;
+	for (size_t i = 0; i < eyecatcher_.size(); ++i)
+		command += '\b';
 
-    process_command(command);*/
-	process_command(eyecatcher_);
+	process_command(command);*/
+	process_command(eyecatcher_ + "\n");
 }
 
-void CommandServer::send_response(const std::string & response)
+void CommandServer::send_response(const std::string& response)
 {
-    std::cout << "Server says: [" << response << "]" << std::endl;
-    std::cout << "Server sends: " << response.size() << " bytes" <<std::endl;
+	std::cout << "Server says: [" << response << "]" << std::endl;
+	std::cout << "Server sends: " << response.size() << " bytes" << std::endl;
 
-    CommandMessage commandMessage{ response, "str2" };
-    commandMessage.send(socket_);
+	CommandMessage commandMessage{ response, "str2" };
+	commandMessage.send(socket_);
 }
 
 void CommandServer::handle_client() {
 
-    //process_command(eyecatcher_); // Find the end of cmd output.
-    send_eyecatcher();
+	//process_command(eyecatcher_); // Find the end of cmd output.
+	//send_eyecatcher();
 
-    try
-    {
+	try
+	{
 		std::string response = "Welcome to Marty's command server. Type 'exit' to quit.\n";
 		response += "Current user: " + GetCurrentUserName() + "\n";
 		response += "Current SID: " + GetCurrentSid() + "\n\n";
-            
-        response += read_stdout_response();
-        send_response(response);
 
-        while (true) {
-            auto request = CommandMessage::try_receive(socket_);
+		response += read_stdout_response();
+		send_response(response);
 
-            process_command(request.get_payload() + "\n");
-            send_eyecatcher();
+		while (true) {
+			auto request = CommandMessage::try_receive(socket_);
 
-            auto response = read_stdout_response();
-            send_response(response);
-        }
-    }
-    catch (EndOfFileException&) {
-        std::cout << "Connection closed by client" << std::endl;
-    }
+			process_command(request.get_payload() + "\n");
+			//send_eyecatcher();
+
+			auto response = read_stdout_response();
+			send_response(response);
+		}
+	}
+	catch (EndOfFileException&) {
+		std::cout << "Connection closed by client" << std::endl;
+	}
 }
 
-void CommandServer::process_command(const std::string & command)
+void CommandServer::process_command(const std::string& command)
 {
-    std::cout << "Processing command: " << command << std::endl;
+	std::cout << "Processing command: " << command << std::endl;
 	//std::string commandLine = command + "\n"; // signal cmd.exe to process it
 
-    // Write the command to the cmd.exe process's STDIN
-    DWORD written;
-    if (!WriteFile(stdInWrite_, command.c_str(), command.size(), &written, NULL)) {
-        throw std::runtime_error("Failed to write to child process");
-    }
+	// Write the command to the cmd.exe process's STDIN
+	DWORD written;
+	if (!WriteFile(stdInWrite_, command.c_str(), command.size(), &written, NULL)) {
+		throw std::runtime_error("Failed to write to child process");
+	}
 }
 
-std::string CommandServer::read_stdout_response() {
-    DWORD read;
-    std::string stdOutResponse;
-    std::vector<char> output_buffer(1024 * 10);
+//std::string CommandServer::read_stdout_response() {
+//    DWORD read;
+//    std::string stdOutResponse;
+//    std::vector<char> output_buffer(1024 * 10);
+//
+//    while (true) {
+//        if (!ReadFile(stdOutRead_, output_buffer.data(), output_buffer.size(), &read, NULL) || read == 0) {
+//            throw std::runtime_error("Failed to read stdout pipe");
+//        }
+//        
+//        stdOutResponse.append(output_buffer.data(), read);
+//        if (stdOutResponse.find(eyecatcher_) != std::string::npos) {
+//            send_delete_eyecatcher();
+//            break;
+//        }
+//    }
+//
+//	// Discard the marker   
+//    size_t marker_pos = stdOutResponse.find(eyecatcher_);
+//    if (marker_pos != std::string::npos) {
+//        stdOutResponse.resize(marker_pos);
+//    }
+//
+//    return stdOutResponse;
+//}
 
-    while (true) {
-        if (!ReadFile(stdOutRead_, output_buffer.data(), output_buffer.size(), &read, NULL) || read == 0) {
-            throw std::runtime_error("Failed to read stdout pipe");
-        }
-        
-        stdOutResponse.append(output_buffer.data(), read);
-        if (stdOutResponse.find(eyecatcher_) != std::string::npos) {
-            send_delete_eyecatcher();
-            break;
-        }
-    }
+std::string CommandServer::read_stdout_response() {
+	std::string stdOutResponse;
+	std::vector<char> output_buffer(1024 * 10);
+	auto start_time = std::chrono::steady_clock::now();
+	const auto timeout = std::chrono::seconds(5); // Adjust the timeout as needed
+
+	while (true) {
+		DWORD bytesAvailable = 0;
+		if (!PeekNamedPipe(stdOutRead_, NULL, 0, NULL, &bytesAvailable, NULL)) {
+			throw std::runtime_error("Failed to peek into stdout pipe");
+		}
+
+		if (bytesAvailable == 0)
+			std::this_thread::sleep_for(std::chrono::milliseconds(50));
+		else
+		{
+			DWORD bytesRead;
+			if (!ReadFile(stdOutRead_, output_buffer.data(), output_buffer.size(), &bytesRead, NULL) || bytesRead == 0) {
+				throw std::runtime_error("Failed to read stdout pipe");
+			}
+
+			stdOutResponse.append(output_buffer.data(), bytesRead);
+			//if (stdOutResponse.find(eyecatcher_) != std::string::npos) {
+			//	//send_delete_eyecatcher();
+			//	break;
+			//}
+
+			start_time = std::chrono::steady_clock::now();
+		}
+
+		// Check for timeout to detect if cmd.exe is waiting for input
+		auto current_time = std::chrono::steady_clock::now();
+		if (current_time - start_time > timeout) {
+			if (!stdOutResponse.empty())
+				break;
+		}
+	}
 
 	// Discard the marker   
-    size_t marker_pos = stdOutResponse.find(eyecatcher_);
-    if (marker_pos != std::string::npos) {
-        stdOutResponse.resize(marker_pos);
-    }
+	/*size_t marker_pos = stdOutResponse.find(eyecatcher_);
+	if (marker_pos != std::string::npos) {
+		stdOutResponse.resize(marker_pos);
+	}*/
 
-    return stdOutResponse;
+	return stdOutResponse;
 }
