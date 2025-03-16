@@ -16,6 +16,7 @@ namespace CommandLib {
         std::string read_stdout_response();
 
         void send_eyecatcher();
+        void send_delete_eyecatcher();
         void send_response(const std::string& response);
         void process_command(const std::string& command);
 

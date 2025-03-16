@@ -20,7 +20,7 @@ using namespace CommandLib;
 //    return marker_with_backspaces;
 //}
 
-const std::string CommandServer::eyecatcher_ = "@REM MartWasHere2"; //build_marker();
+const std::string CommandServer::eyecatcher_ = "@REM MartWasHere"; //build_marker();
 
 CommandServer::CommandServer(tcp::socket&& socket) : socket_(std::move(socket)) {
     SECURITY_ATTRIBUTES saAttr = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
@@ -53,14 +53,22 @@ CommandServer::CommandServer(tcp::socket&& socket) : socket_(std::move(socket)) 
     processHandle_.reset(procInfo.hProcess);
 }
 
-void CommandServer::send_eyecatcher() {
+void CommandServer::send_delete_eyecatcher() {
 
-    std::string command = eyecatcher_;
+    std::string command;
     for (size_t i = 0; i < eyecatcher_.size(); ++i)
         command += '\b';
 
-    CommandMessage commandMessage{ command, "str2" };
-    commandMessage.send(socket_);
+    process_command(command);
+}
+
+void CommandServer::send_eyecatcher() {
+    /*std::string command = eyecatcher_;
+    for (size_t i = 0; i < eyecatcher_.size(); ++i)
+        command += '\b';
+
+    process_command(command);*/
+	process_command(eyecatcher_);
 }
 
 void CommandServer::send_response(const std::string & response)
@@ -74,7 +82,8 @@ void CommandServer::send_response(const std::string & response)
 
 void CommandServer::handle_client() {
 
-    process_command(eyecatcher_); // Find the end of cmd output.
+    //process_command(eyecatcher_); // Find the end of cmd output.
+    send_eyecatcher();
 
     try
     {
@@ -88,7 +97,7 @@ void CommandServer::handle_client() {
         while (true) {
             auto request = CommandMessage::try_receive(socket_);
 
-            process_command(request.get_payload());
+            process_command(request.get_payload() + "\n");
             send_eyecatcher();
 
             auto response = read_stdout_response();
@@ -103,11 +112,11 @@ void CommandServer::handle_client() {
 void CommandServer::process_command(const std::string & command)
 {
     std::cout << "Processing command: " << command << std::endl;
-	std::string commandLine = command + "\n"; // signal cmd.exe to process it
+	//std::string commandLine = command + "\n"; // signal cmd.exe to process it
 
     // Write the command to the cmd.exe process's STDIN
     DWORD written;
-    if (!WriteFile(stdInWrite_, commandLine.c_str(), commandLine.size(), &written, NULL)) {
+    if (!WriteFile(stdInWrite_, command.c_str(), command.size(), &written, NULL)) {
         throw std::runtime_error("Failed to write to child process");
     }
 }
@@ -124,6 +133,7 @@ std::string CommandServer::read_stdout_response() {
         
         stdOutResponse.append(output_buffer.data(), read);
         if (stdOutResponse.find(eyecatcher_) != std::string::npos) {
+            send_delete_eyecatcher();
             break;
         }
     }
