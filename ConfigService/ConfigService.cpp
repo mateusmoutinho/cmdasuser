@@ -79,7 +79,7 @@ void DisplayUsersWithLogonAsServiceRight() {
     ZeroMemory(&objectAttributes, sizeof(objectAttributes));
 
     LSA_HANDLE policyHandle;
-    if (LsaOpenPolicy(NULL, &objectAttributes, POLICY_LOOKUP_NAMES, &policyHandle) != 0) {
+    if (LsaOpenPolicy(NULL, &objectAttributes, POLICY_LOOKUP_NAMES | POLICY_VIEW_LOCAL_INFORMATION, &policyHandle) != 0) {
         std::cerr << "Failed to open policy handle." << std::endl;
         return;
     }
