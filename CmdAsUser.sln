@@ -15,6 +15,10 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CommandLib", "CommandLib\Co
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ConfigServiceUser", "ConfigServiceUser\ConfigServiceUser.vcxproj", "{CEA26719-C8D3-4360-9949-95E161DE3BD5}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CommandInjectee", "CommandInjectee\CommandInjectee.vcxproj", "{2194454E-0E84-4076-BB67-50FAEE2BC661}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CommandInjector", "CommandInjector\CommandInjector.vcxproj", "{C936743C-91BE-4787-9410-88A41AD180E1}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -45,6 +49,14 @@ Global
 		{CEA26719-C8D3-4360-9949-95E161DE3BD5}.Debug|Win32.Build.0 = Debug|Win32
 		{CEA26719-C8D3-4360-9949-95E161DE3BD5}.Release|Win32.ActiveCfg = Release|Win32
 		{CEA26719-C8D3-4360-9949-95E161DE3BD5}.Release|Win32.Build.0 = Release|Win32
+		{2194454E-0E84-4076-BB67-50FAEE2BC661}.Debug|Win32.ActiveCfg = Debug|Win32
+		{2194454E-0E84-4076-BB67-50FAEE2BC661}.Debug|Win32.Build.0 = Debug|Win32
+		{2194454E-0E84-4076-BB67-50FAEE2BC661}.Release|Win32.ActiveCfg = Release|Win32
+		{2194454E-0E84-4076-BB67-50FAEE2BC661}.Release|Win32.Build.0 = Release|Win32
+		{C936743C-91BE-4787-9410-88A41AD180E1}.Debug|Win32.ActiveCfg = Debug|Win32
+		{C936743C-91BE-4787-9410-88A41AD180E1}.Debug|Win32.Build.0 = Debug|Win32
+		{C936743C-91BE-4787-9410-88A41AD180E1}.Release|Win32.ActiveCfg = Release|Win32
+		{C936743C-91BE-4787-9410-88A41AD180E1}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
