@@ -77,7 +77,7 @@ void DisplayError(NTSTATUS status) {
 
 std::wstring FormatAccountName(LSA_REFERENCED_DOMAIN_LIST* domainList, LSA_TRANSLATED_NAME* translatedName) {
     std::wstring account(translatedName->Name.Buffer, translatedName->Name.Length / sizeof(wchar_t));
-    if (translatedName->DomainIndex >= 0 && translatedName->DomainIndex < domainList->Entries) {
+    if ((translatedName->DomainIndex >= 0) && (translatedName->DomainIndex < (LONG)domainList->Entries)) {
         std::wstring domain(
             domainList->Domains[translatedName->DomainIndex].Name.Buffer, 
             domainList->Domains[translatedName->DomainIndex].Name.Length / sizeof(wchar_t));
