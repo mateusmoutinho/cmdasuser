@@ -75,6 +75,19 @@ void DisplayError(NTSTATUS status) {
     std::wcerr << L"Error: " << (LPWSTR)errorMsg << std::endl;
 }
 
+std::wstring FormatAccountName(LSA_REFERENCED_DOMAIN_LIST* domainList, LSA_TRANSLATED_NAME* translatedName) {
+    std::wstring account(translatedName->Name.Buffer, translatedName->Name.Length / sizeof(wchar_t));
+    if (translatedName->DomainIndex >= 0 && translatedName->DomainIndex < domainList->Entries) {
+        std::wstring domain(
+            domainList->Domains[translatedName->DomainIndex].Name.Buffer, 
+            domainList->Domains[translatedName->DomainIndex].Name.Length / sizeof(wchar_t));
+        return domain + L"\\" + account;
+    }
+    else {
+        return account;
+    }
+}
+
 void DisplayUsersWithLogonAsServiceRight() {
     LSA_OBJECT_ATTRIBUTES objectAttributes;
     ZeroMemory(&objectAttributes, sizeof(objectAttributes));
@@ -92,9 +105,9 @@ void DisplayUsersWithLogonAsServiceRight() {
     userRightsString.Length = static_cast<USHORT>(right.size() * sizeof(wchar_t));
     userRightsString.MaximumLength = static_cast<USHORT>((right.size() + 1) * sizeof(wchar_t));
 
+    ULONG countReturned = 0;
     LSA_ENUMERATION_HANDLE enumHandle = 0;
     PLSA_ENUMERATION_INFORMATION enumBuffer = nullptr;
-    ULONG countReturned = 0;
 
     NTSTATUS status = LsaEnumerateAccountsWithUserRight(policyHandle, &userRightsString, (void**)&enumBuffer, &countReturned);
     if (status != 0) {
@@ -103,13 +116,20 @@ void DisplayUsersWithLogonAsServiceRight() {
     }
     LsaMemoryWrapper enumBufferWrapper(enumBuffer);
 
+    std::wcout << L"Found: " << countReturned << L" accounts with: " << right << std::endl;
+
     for (ULONG i = 0; i < countReturned; ++i) {
-        LSA_TRANSLATED_NAME* translatedName = nullptr;
+        LSA_TRANSLATED_NAME* translatedNames = nullptr;
         LSA_REFERENCED_DOMAIN_LIST* domainList = nullptr;
-        if (LsaLookupSids(policyHandle, 1, &enumBuffer[i].Sid, &domainList, &translatedName) == 0) {
-            LsaMemoryWrapper translatedNameWrapper(translatedName);
+        status = LsaLookupSids(policyHandle, 1, &enumBuffer[i].Sid, &domainList, &translatedNames);
+        if (status == 0) {
+            LsaMemoryWrapper translatedNamesWrapper(translatedNames);
             LsaMemoryWrapper domainListWrapper(domainList);
-            std::wcout << translatedName->Name.Buffer << std::endl;
+            std::wstring formattedName = FormatAccountName(domainList, translatedNames);
+            std::wcout << (i + 1) << L": " << formattedName << std::endl;
+        }
+        else {
+            DisplayError(status);
         }
     }
 }
