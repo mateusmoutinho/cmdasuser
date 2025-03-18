@@ -22,7 +22,7 @@
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{CEA26719-C8D3-4360-9949-95E161DE3BD5}</ProjectGuid>
-    <RootNamespace>ConfigService</RootNamespace>
+    <RootNamespace>ConfigServiceUser</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -132,7 +132,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="ConfigService.cpp" />
+    <ClCompile Include="ConfigServiceUser.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\CommandLib\CommandLib.vcxproj">
