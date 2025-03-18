@@ -236,12 +236,74 @@ void RemoveLogonAsServiceRight(const std::wstring& accountName) {
     std::wcout << L"Successfully removed 'Logon as a service' right from account: " << accountName << std::endl;
 }
 
+void RemoveUnMappableLogonAsServiceAccounts() {
+    LSA_OBJECT_ATTRIBUTES objectAttributes;
+    ZeroMemory(&objectAttributes, sizeof(objectAttributes));
+
+    LSA_HANDLE policyHandle;
+    if (LsaOpenPolicy(NULL, &objectAttributes, POLICY_LOOKUP_NAMES | POLICY_VIEW_LOCAL_INFORMATION | POLICY_CREATE_ACCOUNT, &policyHandle) != 0) {
+        std::cerr << "Failed to open policy handle." << std::endl;
+        return;
+    }
+    LsaHandleWrapper policyHandleWrapper(policyHandle);
+
+    LSA_UNICODE_STRING userRightsString;
+    std::wstring right = L"SeServiceLogonRight";
+    userRightsString.Buffer = const_cast<wchar_t*>(right.c_str());
+    userRightsString.Length = static_cast<USHORT>(right.size() * sizeof(wchar_t));
+    userRightsString.MaximumLength = static_cast<USHORT>((right.size() + 1) * sizeof(wchar_t));
+
+    ULONG countReturned = 0;
+    LSA_ENUMERATION_HANDLE enumHandle = 0;
+    PLSA_ENUMERATION_INFORMATION enumBuffer = nullptr;
+
+    NTSTATUS status = LsaEnumerateAccountsWithUserRight(policyHandle, &userRightsString, (void**)&enumBuffer, &countReturned);
+    if (status != 0) {
+        DisplayError(status);
+        return;
+    }
+    LsaMemoryWrapper enumBufferWrapper(enumBuffer);
+
+    std::wcout << L"Found: " << countReturned << L" accounts with: " << right << std::endl;
+
+    for (ULONG i = 0; i < countReturned; ++i) {
+        LSA_TRANSLATED_NAME* translatedNames = nullptr;
+        LSA_REFERENCED_DOMAIN_LIST* domainList = nullptr;
+        status = LsaLookupSids(policyHandle, 1, &enumBuffer[i].Sid, &domainList, &translatedNames);
+
+        if (status == 0) {
+            LsaMemoryWrapper domainListWrapper(domainList);
+            LsaMemoryWrapper translatedNamesWrapper(translatedNames);
+        }
+        else {
+            // From NtStatus.h - including it causes header conflicts.
+            // Cannot map account to SID...
+            #define STATUS_NONE_MAPPED ((NTSTATUS)0xC0000073L) 
+
+            if (status == STATUS_NONE_MAPPED) {
+                std::wcout << L"Removing unmappable account with SID: " << enumBuffer[i].Sid << std::endl;
+                status = LsaRemoveAccountRights(policyHandle, enumBuffer[i].Sid, FALSE, &userRightsString, 1);
+                if (status != 0) {
+                    DisplayError(status);
+                }
+                else {
+                    std::wcout << L"Successfully removed 'Logon as a service' right from unmappable account." << std::endl;
+                }
+            }
+            else {
+                DisplayError(status);
+            }
+        }
+    }
+}
+
 void DisplayUsage(const wchar_t* programName) {
     std::wcerr << L"Usage: " << programName << L" <command> [<AccountName>]" << std::endl;
     std::wcerr << L"Commands:" << std::endl;
     std::wcerr << L"  add <AccountName>    Add 'Logon as a service' right to the specified account" << std::endl;
     std::wcerr << L"  remove <AccountName> Remove 'Logon as a service' right from the specified account" << std::endl;
     std::wcerr << L"  list                 Display users with 'Logon as a service' right" << std::endl;
+    std::wcerr << L"  cleanup              Remove 'Logon as a service' right for unmappable accounts" << std::endl;
     std::wcerr << L"Examples:" << std::endl;
     std::wcerr << L"  " << programName << L" add LocalUser" << std::endl;
     std::wcerr << L"  " << programName << L" add DOMAIN\\DomainUser" << std::endl;
@@ -252,6 +314,7 @@ void DisplayUsage(const wchar_t* programName) {
     std::wcerr << L"  " << programName << L" remove LocalGroup" << std::endl;
     std::wcerr << L"  " << programName << L" remove DOMAIN\\DomainGroup" << std::endl;
     std::wcerr << L"  " << programName << L" list" << std::endl;
+    std::wcerr << L"  " << programName << L" cleanup" << std::endl;
 }
 
 int wmain(int argc, wchar_t* argv[]) {
@@ -281,6 +344,9 @@ int wmain(int argc, wchar_t* argv[]) {
         }
         else if (command == L"list") {
             DisplayUsersWithLogonAsServiceRight();
+        }
+        else if (command == L"cleanup") {
+            RemoveUnMappableLogonAsServiceAccounts();
         }
         else {
             std::wcerr << L"Unknown command: " << command << std::endl;
