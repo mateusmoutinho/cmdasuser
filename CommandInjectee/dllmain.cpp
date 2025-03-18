@@ -1,5 +1,19 @@
-#define WIN32_LEAN_AND_MEAN             // Exclude rarely-used stuff from Windows headers
-#include <windows.h>
+#include <iostream>
+#include <string>
+#include <thread>
+#include <vector>
+#include <array>
+#include <memory>
+#include <cstdio>
+#include <utility>
+#include <optional>
+#include <asio.hpp>
+#include <CommandLib.h>
+#include <tchar.h>
+#include <windows.h> // wsock2.h is included in CommandLib.h
+
+using asio::ip::tcp;
+using namespace CommandLib;
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID) {
     switch (reason)
